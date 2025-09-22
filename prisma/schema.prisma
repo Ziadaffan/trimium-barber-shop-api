@@ -1,0 +1,38 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider  = "postgresql"
+    url       = env("DATABASE_URL")
+    directUrl = env("DIRECT_URL")
+}
+
+enum ReservationStatus {
+    PENDING
+    COMPLETED
+    CANCELLED
+}
+
+model Barber {
+    id    String @id @default(uuid())
+    name  String
+    email String @unique
+    phone String
+
+    Reservation Reservation[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model Reservation {
+    id       String            @id @default(uuid())
+    barberId String
+    barber   Barber            @relation(fields: [barberId], references: [id])
+    date     DateTime
+    status   ReservationStatus @default(PENDING)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
