@@ -42,11 +42,7 @@ app.use((err: Error, req: Request, res: Response, next: any) => {
 });
 
 app.listen(PORT, () => {
-  if (process.env.ENV === 'dev') {
-    console.log(`🚀 Server is running on port ${PORT} in ${process.env.ENV} mode`);
-  } else {
-    console.log(`🚀 Server is running on port ${PORT} in ${process.env.ENV} mode`);
-  }
+  console.log(`🚀 Server is running at http://localhost:${PORT} in ${process.env.ENV} mode`);
 });
 
 export default app;

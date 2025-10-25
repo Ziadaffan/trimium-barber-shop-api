@@ -3,15 +3,21 @@ generator client {
 }
 
 datasource db {
-    provider  = "postgresql"
-    url       = env("DATABASE_URL")
-    directUrl = env("DIRECT_URL")
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
 }
 
 enum ReservationStatus {
     PENDING
     COMPLETED
     CANCELLED
+}
+
+enum ServiceType {
+    HAIRCUT
+    BEARD_TRIM
+    SHAVING
+    OTHER
 }
 
 model Barber {
@@ -32,6 +38,22 @@ model Reservation {
     barber   Barber            @relation(fields: [barberId], references: [id])
     date     DateTime
     status   ReservationStatus @default(PENDING)
+
+    clientName  String
+    clientPhone String
+    clientEmail String
+
+    serviceId String
+    service   Service @relation(fields: [serviceId], references: [id])
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model Service {
+    id           String        @id @default(uuid())
+    type         ServiceType   @unique
+    reservations Reservation[]
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
