@@ -20,6 +20,16 @@ enum ServiceType {
     OTHER
 }
 
+enum DayOfWeek {
+    MONDAY
+    TUESDAY
+    WEDNESDAY
+    THURSDAY
+    FRIDAY
+    SATURDAY
+    SUNDAY
+}
+
 model Barber {
     id    String @id @default(uuid())
     name  String
@@ -27,6 +37,7 @@ model Barber {
     phone String
 
     Reservation Reservation[]
+    schedules  BarberSchedule[]
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
@@ -53,8 +64,25 @@ model Reservation {
 model Service {
     id           String        @id @default(uuid())
     type         ServiceType   @unique
+    nameEn         String
+    nameFr         String
     reservations Reservation[]
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
+}
+
+model BarberSchedule {
+    id        String    @id @default(uuid())
+    barberId  String
+    barber    Barber    @relation(fields: [barberId], references: [id])
+    dayOfWeek DayOfWeek
+    startTime String    // Format: "09:00"
+    endTime   String    // Format: "18:00"
+    isActive  Boolean   @default(true)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([barberId, dayOfWeek])
 }

@@ -3,6 +3,110 @@ import prisma from '@/packages/lib/db';
 import { ReservationStatus } from '@prisma/client';
 import { parse } from 'date-fns';
 
+export const getAvailableTimes = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { date, barberId, serviceType } = req.body;
+    
+    // Vérifier que le barbier existe
+    const barber = await prisma.barber.findUnique({
+      where: { id: barberId },
+    });
+
+    if (!barber) {
+      throw new Error('Barber not found');
+    }
+
+    // Vérifier que le service existe
+    const service = await prisma.service.findUnique({
+      where: { type: serviceType },
+    });
+
+    if (!service) {
+      throw new Error('Service not found');
+    }
+
+    // Obtenir le jour de la semaine
+    const requestedDate = new Date(date);
+    const dayOfWeek = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'][requestedDate.getDay()];
+
+    // Récupérer l'horaire du barbier pour ce jour
+    const barberSchedule = await prisma.barberSchedule.findUnique({
+      where: {
+        barberId_dayOfWeek: {
+          barberId,
+          dayOfWeek: dayOfWeek as any
+        }
+      }
+    });
+
+    if (!barberSchedule || !barberSchedule.isActive) {
+      return res.status(200).json({
+        date,
+        barberId,
+        serviceType,
+        availableTimes: [],
+        totalSlots: 0,
+        bookedSlots: 0,
+        message: 'Barber not available on this day'
+      });
+    }
+
+    // Générer les heures disponibles selon l'horaire du barbier
+    const startHour = parseInt(barberSchedule.startTime.split(':')[0]);
+    const endHour = parseInt(barberSchedule.endTime.split(':')[0]);
+    
+    const allTimes = [];
+    for (let hour = startHour; hour < endHour; hour++) {
+      allTimes.push(`${hour.toString().padStart(2, '0')}:00`);
+    }
+
+    // Récupérer les réservations existantes pour cette date et ce barbier
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const existingReservations = await prisma.reservation.findMany({
+      where: {
+        barberId,
+        date: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+        status: {
+          not: 'CANCELLED'
+        }
+      },
+    });
+
+    // Convertir les réservations existantes en heures
+    const bookedTimes = existingReservations.map(reservation => {
+      const reservationDate = new Date(reservation.date);
+      return `${reservationDate.getHours().toString().padStart(2, '0')}:00`;
+    });
+
+    // Filtrer les heures disponibles
+    const availableTimes = allTimes.filter(time => !bookedTimes.includes(time));
+
+    res.status(200).json({
+      date,
+      barberId,
+      serviceType,
+      availableTimes,
+      totalSlots: allTimes.length,
+      bookedSlots: bookedTimes.length,
+      barberSchedule: {
+        startTime: barberSchedule.startTime,
+        endTime: barberSchedule.endTime,
+        dayOfWeek: barberSchedule.dayOfWeek
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getReservations = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const reservations = await prisma.reservation.findMany();
