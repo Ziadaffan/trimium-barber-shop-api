@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import express, { Application, Request, Response } from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import { errorHandlerMiddleware } from '@/api/middlewares/error.handler.middleware';
 
 dotenv.config();
 
@@ -33,13 +34,7 @@ app.use('*', (req: Request, res: Response) => {
   });
 });
 
-app.use((err: Error, req: Request, res: Response, next: any) => {
-  console.error(err.stack);
-  res.status(500).json({
-    error: 'Something went wrong!',
-    message: process.env.ENV === 'dev' ? err.message : 'Internal server error',
-  });
-});
+app.use(errorHandlerMiddleware);
 
 app.listen(PORT, () => {
   console.log(`🚀 Server is running at http://localhost:${PORT} in ${process.env.ENV} mode`);

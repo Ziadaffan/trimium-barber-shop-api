@@ -59,6 +59,8 @@ model Reservation {
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
+
+    @@unique([date, barberId])
 }
 
 model Service {
@@ -66,6 +68,7 @@ model Service {
     type         ServiceType   @unique
     nameEn         String
     nameFr         String
+    duration       Int         @default(60) // In minutes
     reservations Reservation[]
 
     createdAt DateTime @default(now())
