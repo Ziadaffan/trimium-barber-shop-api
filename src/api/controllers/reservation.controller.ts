@@ -152,7 +152,15 @@ export const getAvailableTimes = async (req: Request, res: Response, next: NextF
 
 export const getReservations = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const reservations = await prisma.reservation.findMany();
+    const reservations = await prisma.reservation.findMany({
+      include: {
+        barber: true,
+        service: true,
+      },
+      orderBy: {
+        date: 'desc',
+      },
+    });
     res.status(200).json(reservations);
   } catch (error) {
     next(error);
