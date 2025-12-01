@@ -5,13 +5,15 @@
   "main": "dist/app.js",
   "scripts": {
     "build": "tsc && tsc-alias",
-    "build:esbuild": "esbuild src/app.ts --bundle --platform=node --outfile=dist/app.js --external:@prisma/client",
-    "start": "node dist/app.js",
+    "start": "node -r tsconfig-paths/register dist/app.js",
     "dev": "dotenv -e .env.local -- ts-node-dev --respawn --transpile-only -r tsconfig-paths/register src/app.ts",
+    
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+
     "container:up": "docker compose up -d",
     "container:stop": "docker compose stop",
+
     "migration:generate": "dotenv -e .env.local -- prisma migrate dev --create-only --name",
     "migration:run": "dotenv -e .env.local -- prisma migrate dev",
     "migration:deploy": "dotenv -e .env.local -- prisma migrate deploy",
