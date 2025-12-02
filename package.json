@@ -29,6 +29,9 @@
   ],
   "author": "",
   "license": "ISC",
+  "_moduleAliases": {
+    "@": "dist/src"
+  },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",
     "@prisma/client": "^6.13.0",
