@@ -19,7 +19,7 @@ export const getServices = async (req: Request, res: Response, next: NextFunctio
     }
     const services = await prisma.service.findMany();
 
-    const formattedServices: GetServicesResponse[] = services.map(service => ({
+    const formattedServices: GetServicesResponse[] = services.map((service: any) => ({
       id: service.id,
       type: service.type,
       name: language === 'fr' ? service.nameFr : service.nameEn,
