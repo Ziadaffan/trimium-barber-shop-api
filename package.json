@@ -2,11 +2,11 @@
   "name": "trimium-barber-shop-api",
   "version": "1.0.0",
   "description": "Express API for Trimium Barber Shop",
-  "main": "dist/app.js",
+  "main": "dist/index.js",
   "scripts": {
     "build": "tsc && tsc-alias",
-    "start": "node -r tsconfig-paths/register dist/app.js",
-    "dev": "dotenv -e .env.local -- ts-node-dev --respawn --transpile-only -r tsconfig-paths/register src/app.ts",
+    "start": "node -r tsconfig-paths/register dist/index.js",
+    "dev": "dotenv -e .env.local -- ts-node-dev --respawn --transpile-only -r tsconfig-paths/register src/index.ts",
     
     "format": "prettier --write .",
     "format:check": "prettier --check .",
