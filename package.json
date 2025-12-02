@@ -30,7 +30,7 @@
   "author": "",
   "license": "ISC",
   "_moduleAliases": {
-    "@": "dist/src"
+    "@": "dist"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",
