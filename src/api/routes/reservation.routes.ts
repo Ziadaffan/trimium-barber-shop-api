@@ -5,7 +5,7 @@ import {
   getAvailableTimes,
   getReservations,
   updateReservation,
-} from '@/api/controllers/reservation.controller';
+} from '../controllers/reservation.controller';
 
 const router = Router();
 

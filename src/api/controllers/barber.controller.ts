@@ -1,4 +1,4 @@
-import prisma from '@/packages/lib/db';
+import prisma from '../../packages/lib/db';
 import { NextFunction, Request, Response } from 'express';
 
 export const getBarbers = async (req: Request, res: Response, next: NextFunction) => {

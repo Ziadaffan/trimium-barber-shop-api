@@ -1,9 +1,9 @@
 import { NextFunction, Request, Response } from 'express';
-import prisma from '@/packages/lib/db';
+import prisma from '../../packages/lib/db';
 import { ReservationStatus } from '@prisma/client';
 import { parse, format } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
-import { throwError } from '@/packages/common/utils/error.handler.utils';
+import { throwError } from '../../packages/common/utils/error.handler.utils';
 
 export const getAvailableTimes = async (req: Request, res: Response, next: NextFunction) => {
   try {

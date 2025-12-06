@@ -1,4 +1,4 @@
-import { createService, deleteService, getServices, updateService } from '@/api/controllers/service.controller';
+import { createService, deleteService, getServices, updateService } from '../controllers/service.controller';
 import { Router } from 'express';
 
 const router = Router();

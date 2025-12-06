@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { reservationRoutes } from '@/api/routes/reservation.routes';
-import { barberRoutes } from '@/api/routes/barber.routes';
-import { serviceRoutes } from '@/api/routes/service.routes';
-import { scheduleRoutes } from '@/api/routes/schedule.routes';
+import { reservationRoutes } from './routes/reservation.routes';
+import { barberRoutes } from './routes/barber.routes';
+import { serviceRoutes } from './routes/service.routes';
+import { scheduleRoutes } from './routes/schedule.routes';
 
 const router = Router();
 

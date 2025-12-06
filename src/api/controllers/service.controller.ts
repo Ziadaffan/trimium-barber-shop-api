@@ -1,4 +1,4 @@
-import prisma from '@/packages/lib/db';
+import prisma from '../../packages/lib/db';
 import { ServiceType } from '@prisma/client';
 import { NextFunction, Request, Response } from 'express';
 

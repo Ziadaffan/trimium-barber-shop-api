@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-import prisma from '@/packages/lib/db';
+import prisma from '../../packages/lib/db';
 import { DayOfWeek } from '@prisma/client';
 
 export const getBarberSchedule = async (req: Request, res: Response, next: NextFunction) => {

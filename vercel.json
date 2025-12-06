@@ -2,15 +2,10 @@
   "version": 2,
   "buildCommand": "npx prisma generate && npm run build",
   "installCommand": "npm install",
-  "functions": {
-    "api/index.js": {
-      "includeFiles": "dist/**"
-    }
-  },
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/api"
+      "destination": "/dist/index.js"
     }
   ]
 }

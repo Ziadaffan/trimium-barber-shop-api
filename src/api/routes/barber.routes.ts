@@ -1,4 +1,4 @@
-import { createBarber, deleteBarber, getBarbers, updateBarber } from '@/api/controllers/barber.controller';
+import { createBarber, deleteBarber, getBarbers, updateBarber } from '../controllers/barber.controller';
 import { Router } from 'express';
 
 const router = Router();

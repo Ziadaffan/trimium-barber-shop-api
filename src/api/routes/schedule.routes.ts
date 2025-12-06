@@ -4,7 +4,7 @@ import {
   deleteBarberSchedule,
   getBarberSchedule,
   updateBarberSchedule,
-} from '@/api/controllers/schedule.controller';
+} from '../controllers/schedule.controller';
 
 const router = Router();
 

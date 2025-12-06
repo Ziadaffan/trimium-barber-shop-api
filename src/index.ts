@@ -1,11 +1,11 @@
 import 'module-alias/register';
-import router from '@/api/router';
+import router from './api/router';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express, { Application, Request, Response } from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import { errorHandlerMiddleware } from '@/api/middlewares/error.handler.middleware';
+import { errorHandlerMiddleware } from './api/middlewares/error.handler.middleware';
 
 dotenv.config();
 
