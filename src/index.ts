@@ -18,11 +18,8 @@ app.use(morgan('combined'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use('/', (req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-  });
+app.get('/', (req: Request, res: Response) => {
+  res.redirect('/health');
 });
 
 app.get('/health', (req: Request, res: Response) => {

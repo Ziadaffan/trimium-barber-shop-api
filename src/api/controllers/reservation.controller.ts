@@ -55,7 +55,13 @@ export const getAvailableTimes = async (req: Request, res: Response, next: NextF
     });
 
     if (!barberSchedule || !barberSchedule.isActive) {
-      throwError('Barber schedule not found', 404);
+      res.status(200).json({
+        message: 'No available times',
+        availableTimes: [],
+        totalSlots: 0,
+        bookedSlots: 0,
+        barberSchedule: null,
+      });
       return;
     }
 
