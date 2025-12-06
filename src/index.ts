@@ -18,15 +18,21 @@ app.use(morgan('combined'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use('/api', router);
+app.use('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+  });
+});
 
 app.get('/health', (req: Request, res: Response) => {
   res.json({
-    status: 'healthy',
+    status: 'ok',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
   });
 });
+
+app.use('/api', router);
 
 app.use('*', (req: Request, res: Response) => {
   res.status(404).json({
