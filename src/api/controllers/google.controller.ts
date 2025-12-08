@@ -68,7 +68,7 @@ export const handleGoogleCallback = async (req: Request, res: Response, next: Ne
 export const checkGoogleAuthStatus = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { getStoredTokens } = await import('../../packages/google/oAuth2Client');
-    const tokens = getStoredTokens();
+    const tokens = await getStoredTokens();
 
     if (tokens) {
       res.status(200).json({
