@@ -125,7 +125,7 @@ export const addReservationToGoogleCalendar = async ({
   date,
 }: AddReservationToGoogleCalendarProps) => {
   try {
-    const storedTokens = getStoredTokens();
+    const storedTokens = await getStoredTokens();
 
     if (storedTokens) {
       setCredentials(storedTokens);
