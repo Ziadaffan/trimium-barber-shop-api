@@ -47,12 +47,18 @@ export const handleGoogleCallback = async (req: Request, res: Response, next: Ne
       return;
     }
 
-    await prisma.googleCalendarToken.create({
-      data: {
+    await prisma.googleCalendarToken.upsert({
+      where: { calendarId: process.env.GOOGLE_CLIENT_ID },
+      update: {
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        expiryDate: BigInt(tokens.expiry_date || '0'),
+      },
+      create: {
         calendarId: process.env.GOOGLE_CLIENT_ID,
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
-        expiryDate: BigInt(tokens.expiry_date),
+        expiryDate: BigInt(tokens.expiry_date || '0'),
       },
     });
 
