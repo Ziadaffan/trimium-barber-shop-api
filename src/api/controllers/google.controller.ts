@@ -42,14 +42,14 @@ export const handleGoogleCallback = async (req: Request, res: Response, next: Ne
       return;
     }
 
-    if (!process.env.GOOGLE_CALENDAR_ID) {
+    if (!process.env.GOOGLE_CLIENT_ID) {
       throwError('Google Calendar ID is not set', 400);
       return;
     }
 
     await prisma.googleCalendarToken.create({
       data: {
-        calendarId: process.env.GOOGLE_CALENDAR_ID,
+        calendarId: process.env.GOOGLE_CLIENT_ID,
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
         expiryDate: BigInt(tokens.expiry_date),
