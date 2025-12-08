@@ -5,9 +5,7 @@ import { throwError } from '../../packages/common/utils/error.handler.utils';
 export const getProducts = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const products = await prisma.product.findMany();
-    res.status(200).json({
-      products,
-    });
+    res.status(200).json(products);
   } catch (error) {
     next(error);
   }
@@ -24,9 +22,7 @@ export const createProduct = async (req: Request, res: Response, next: NextFunct
     const product = await prisma.product.create({
       data: { name, price, description, images },
     });
-    res.status(201).json({
-      product,
-    });
+    res.status(201).json(product);
   } catch (error) {
     next(error);
   }
@@ -54,9 +50,7 @@ export const updateProduct = async (req: Request, res: Response, next: NextFunct
       where: { id: product.id },
       data: { name, price, description, images },
     });
-    res.status(200).json({
-      product: updatedProduct,
-    });
+    res.status(200).json(updatedProduct);
   } catch (error) {
     next(error);
   }

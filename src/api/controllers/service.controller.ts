@@ -5,9 +5,10 @@ import { NextFunction, Request, Response } from 'express';
 interface GetServicesResponse {
   id: string;
   type: ServiceType;
-  name: string;
-  createdAt: Date;
-  updatedAt: Date;
+  description: string;
+  price: number;
+  duration: number;
+  isPremium: boolean;
 }
 
 export const getServices = async (req: Request, res: Response, next: NextFunction) => {
@@ -17,15 +18,15 @@ export const getServices = async (req: Request, res: Response, next: NextFunctio
     if (!language) {
       language = 'fr';
     }
-    const services = await prisma.service.findMany();
+    const services = await prisma.service.findMany({ where: { isActive: true } });
 
     const formattedServices: GetServicesResponse[] = services.map((service: any) => ({
       id: service.id,
       type: service.type,
-      name: language === 'fr' ? service.nameFr : service.nameEn,
-
-      createdAt: service.createdAt,
-      updatedAt: service.updatedAt,
+      description: service.description,
+      price: service.price,
+      duration: service.duration,
+      isPremium: service.isPremium,
     }));
 
     res.status(200).json(formattedServices);

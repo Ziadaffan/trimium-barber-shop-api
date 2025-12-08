@@ -7,13 +7,10 @@
     "build": "rimraf dist && tsc && tsc-alias -p tsconfig.json -f --outDir dist",
     "start": "node dist/index.js",
     "dev": "dotenv -e .env.local -- ts-node-dev --respawn --transpile-only src/index.ts",
-    
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-
     "container:up": "docker compose up -d",
     "container:stop": "docker compose stop",
-
     "migration:generate": "dotenv -e .env.local -- prisma migrate dev --create-only --name",
     "migration:run": "dotenv -e .env.local -- prisma migrate dev",
     "migration:deploy": "dotenv -e .env.local -- prisma migrate deploy",
@@ -42,10 +39,11 @@
     "dotenv": "^16.3.1",
     "esbuild": "^0.27.0",
     "express": "^4.18.2",
+    "googleapis": "^167.0.0",
     "helmet": "^7.1.0",
+    "module-alias": "^2.2.3",
     "morgan": "^1.10.0",
     "prisma": "^6.13.0",
-    "module-alias": "^2.2.3",
     "tsconfig-paths": "^4.2.0"
   },
   "devDependencies": {

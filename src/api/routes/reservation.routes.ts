@@ -10,9 +10,9 @@ import {
 const router = Router();
 
 router.get('/', getReservations);
+router.get('/available-times', getAvailableTimes);
 router.post('/', createReservation);
 router.put('/:id', updateReservation);
 router.delete('/:id', deleteReservation);
-router.post('/available-times', getAvailableTimes);
 
 export const reservationRoutes = router;

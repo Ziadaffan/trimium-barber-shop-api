@@ -4,10 +4,16 @@ import { ReservationStatus } from '@prisma/client';
 import { parse, format } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { throwError } from '../../packages/common/utils/error.handler.utils';
+import { addReservationToGoogleCalendar } from '../../packages/google/oAuth2Client';
 
 export const getAvailableTimes = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { date, barberId, serviceType } = req.body;
+    const { date, barberId, serviceId } = req.query as { date: string; barberId: string; serviceId: string };
+
+    if (!date || !barberId || !serviceId) {
+      throwError('Date, barberId, and serviceId are required', 400);
+      return;
+    }
 
     const barber = await prisma.barber.findUnique({
       where: { id: barberId },
@@ -18,7 +24,7 @@ export const getAvailableTimes = async (req: Request, res: Response, next: NextF
     }
 
     const service = await prisma.service.findUnique({
-      where: { type: serviceType },
+      where: { id: serviceId },
     });
 
     if (!service) {
@@ -137,20 +143,7 @@ export const getAvailableTimes = async (req: Request, res: Response, next: NextF
       return true; // All required slots are free
     });
 
-    res.status(200).json({
-      date,
-      barberId,
-      serviceType,
-      serviceDuration,
-      availableTimes,
-      totalSlots: allTimes.length,
-      bookedSlots: existingReservations.length,
-      barberSchedule: {
-        startTime: barberSchedule.startTime,
-        endTime: barberSchedule.endTime,
-        dayOfWeek: barberSchedule.dayOfWeek,
-      },
-    });
+    res.status(200).json(availableTimes);
   } catch (error) {
     next(error);
   }
@@ -175,16 +168,33 @@ export const getReservations = async (req: Request, res: Response, next: NextFun
 
 export const createReservation = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { barberId, date, time, name, phone, email, serviceType } = req.body;
+    const { barberId, date, time, clientName, clientPhone, clientEmail, serviceId } = req.body;
+    if (!barberId || !date || !time || !clientName || !clientPhone || !clientEmail || !serviceId) {
+      throwError('All fields are required', 400);
+      return;
+    }
+
     const canadaTimezone = 'America/Toronto';
 
     const dateTimeString = `${date} ${time}`;
-    const parsedDate = parse(dateTimeString, 'yyyy-MM-dd h:mm a', new Date());
+    let parsedDate = parse(dateTimeString, 'yyyy-MM-dd HH:mm', new Date());
+
+    if (isNaN(parsedDate.getTime())) {
+      parsedDate = parse(dateTimeString, 'yyyy-MM-dd h:mm a', new Date());
+    }
+
+    if (isNaN(parsedDate.getTime())) {
+      throwError(
+        'Invalid date or time format. Expected date in yyyy-MM-dd format and time in HH:mm or h:mm a format',
+        400
+      );
+      return;
+    }
 
     const utcDate = fromZonedTime(parsedDate, canadaTimezone);
 
     const service = await prisma.service.findUnique({
-      where: { type: serviceType },
+      where: { id: serviceId },
     });
     if (!service) {
       throwError('Service not found', 404);
@@ -203,9 +213,9 @@ export const createReservation = async (req: Request, res: Response, next: NextF
       barberId,
       date: utcDate,
       status: ReservationStatus.PENDING,
-      clientName: name,
-      clientPhone: phone,
-      clientEmail: email,
+      clientName,
+      clientPhone,
+      clientEmail,
       serviceId: service.id,
     };
 
@@ -220,6 +230,15 @@ export const createReservation = async (req: Request, res: Response, next: NextF
       throwError('Reservation already exists', 400);
       return;
     }
+
+    await addReservationToGoogleCalendar({
+      barberId,
+      clientName,
+      clientPhone,
+      clientEmail,
+      service: service,
+      date: utcDate,
+    });
 
     const reservation = await prisma.reservation.create({
       data,

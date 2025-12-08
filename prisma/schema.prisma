@@ -31,10 +31,12 @@ enum DayOfWeek {
 }
 
 model Barber {
-    id    String @id @default(uuid())
-    name  String
-    email String @unique
-    phone String
+    id               String  @id @default(uuid())
+    name             String
+    email            String  @unique
+    phone            String
+    googleCalendarId String?
+    imageUrl         String?
 
     Reservation Reservation[]
     schedules   BarberSchedule[]
@@ -68,7 +70,11 @@ model Service {
     type         ServiceType   @unique
     nameEn       String
     nameFr       String
+    description  String?
+    price        Float         @default(0)
     duration     Int           @default(60) // In minutes
+    isPremium    Boolean       @default(false)
+    isActive     Boolean       @default(true)
     reservations Reservation[]
 
     createdAt DateTime @default(now())
@@ -99,4 +105,32 @@ model Product {
     isActive    Boolean  @default(true)
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
+}
+
+model GoogleCalendarToken {
+    id           String @id @default(uuid())
+    calendarId   String @unique
+    accessToken  String
+    refreshToken String
+    expiryDate   BigInt
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model Comment {
+    id        String   @id @default(uuid())
+    name      String
+    email     String
+    comment   String
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model Gallery {
+    id        String   @id @default(uuid())
+    image     String
+    position  Int
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
 }

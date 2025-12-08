@@ -6,6 +6,7 @@ import express, { Application, Request, Response } from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { errorHandlerMiddleware } from './api/middlewares/error.handler.middleware';
+import prisma from './packages/lib/db';
 
 dotenv.config();
 
@@ -22,7 +23,7 @@ app.get('/', (req: Request, res: Response) => {
   res.redirect('/health');
 });
 
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', async (req: Request, res: Response) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),

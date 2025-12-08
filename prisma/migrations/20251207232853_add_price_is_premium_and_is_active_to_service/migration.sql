@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "public"."Service" ADD COLUMN     "isActive" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "isPremium" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "price" DOUBLE PRECISION NOT NULL DEFAULT 0;
