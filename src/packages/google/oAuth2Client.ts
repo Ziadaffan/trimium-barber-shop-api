@@ -91,10 +91,17 @@ export const setCredentials = (tokens: any) => {
   });
 };
 
-export const getStoredTokens = () => {
-  const accessToken = process.env.GOOGLE_ACCESS_TOKEN;
-  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
-  const expiryDate = process.env.GOOGLE_TOKEN_EXPIRY_DATE;
+export const getStoredTokens = async () => {
+  const token = await prisma.googleCalendarToken.findUnique({ where: { calendarId: process.env.GOOGLE_CLIENT_ID } });
+
+  if (!token) {
+    console.error('Google Calendar tokens not found in database.');
+    return null;
+  }
+
+  const accessToken = token.accessToken;
+  const refreshToken = token.refreshToken;
+  const expiryDate = token.expiryDate;
 
   if (!accessToken || !refreshToken) {
     console.error('Google Calendar tokens not found in environment variables.');
@@ -105,7 +112,7 @@ export const getStoredTokens = () => {
   return {
     access_token: accessToken,
     refresh_token: refreshToken,
-    expiry_date: expiryDate ? parseInt(expiryDate, 10) : undefined,
+    expiry_date: expiryDate ? expiryDate.toString() : undefined,
   };
 };
 
