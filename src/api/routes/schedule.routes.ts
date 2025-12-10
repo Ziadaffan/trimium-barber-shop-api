@@ -9,8 +9,8 @@ import {
 const router = Router();
 
 router.get('/barber/:barberId', getBarberSchedule);
-router.post('/', createBarberSchedule);
-router.put('/:id', updateBarberSchedule);
-router.delete('/:id', deleteBarberSchedule);
+router.post('/barber/:barberId', createBarberSchedule);
+router.put('/barber/:barberId/:id', updateBarberSchedule);
+router.delete('/barber/:barberId/:id', deleteBarberSchedule);
 
 export const scheduleRoutes = router;

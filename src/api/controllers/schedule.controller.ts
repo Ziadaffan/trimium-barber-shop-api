@@ -9,11 +9,12 @@ export const getBarberSchedule = async (req: Request, res: Response, next: NextF
     const schedules = await prisma.barberSchedule.findMany({
       where: {
         barberId,
-        isActive: true
       },
-      orderBy: {
-        dayOfWeek: 'asc'
-      }
+      orderBy: [
+        { dayOfWeek: 'asc' },
+        { startTime: 'asc' },
+        { endTime: 'asc' },
+      ],
     });
 
     res.status(200).json(schedules);
@@ -24,11 +25,11 @@ export const getBarberSchedule = async (req: Request, res: Response, next: NextF
 
 export const createBarberSchedule = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { barberId, dayOfWeek, startTime, endTime } = req.body;
+    const { barberId } = req.params;
+    const { dayOfWeek, startTime, endTime } = req.body;
 
-    // Vérifier que le barbier existe
     const barber = await prisma.barber.findUnique({
-      where: { id: barberId }
+      where: { id: barberId },
     });
 
     if (!barber) {
@@ -40,8 +41,8 @@ export const createBarberSchedule = async (req: Request, res: Response, next: Ne
         barberId,
         dayOfWeek: dayOfWeek as DayOfWeek,
         startTime,
-        endTime
-      }
+        endTime,
+      },
     });
 
     res.status(201).json(schedule);
@@ -60,8 +61,8 @@ export const updateBarberSchedule = async (req: Request, res: Response, next: Ne
       data: {
         startTime,
         endTime,
-        isActive
-      }
+        isActive,
+      },
     });
 
     res.status(200).json(schedule);
@@ -72,10 +73,18 @@ export const updateBarberSchedule = async (req: Request, res: Response, next: Ne
 
 export const deleteBarberSchedule = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const { barberId, id } = req.params;
+
+    const barber = await prisma.barber.findUnique({
+      where: { id: barberId },
+    });
+
+    if (!barber) {
+      throw new Error('Barber not found');
+    }
 
     await prisma.barberSchedule.delete({
-      where: { id }
+      where: { id, barberId },
     });
 
     res.status(204).send();

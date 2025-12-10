@@ -48,7 +48,7 @@ model Barber {
 model Reservation {
     id       String            @id @default(uuid())
     barberId String
-    barber   Barber            @relation(fields: [barberId], references: [id])
+    barber   Barber            @relation(fields: [barberId], references: [id], onDelete: Cascade)
     date     DateTime
     status   ReservationStatus @default(PENDING)
 
@@ -57,12 +57,13 @@ model Reservation {
     clientEmail String
 
     serviceId String
-    service   Service @relation(fields: [serviceId], references: [id])
+    service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
     @@unique([date, barberId])
+    
 }
 
 model Service {
@@ -84,7 +85,7 @@ model Service {
 model BarberSchedule {
     id        String    @id @default(uuid())
     barberId  String
-    barber    Barber    @relation(fields: [barberId], references: [id])
+    barber    Barber    @relation(fields: [barberId], references: [id], onDelete: Cascade)
     dayOfWeek DayOfWeek
     startTime String // Format: "09:00"
     endTime   String // Format: "18:00"
@@ -93,7 +94,7 @@ model BarberSchedule {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
-    @@unique([barberId, dayOfWeek])
+    @@unique([barberId, dayOfWeek, startTime, endTime])
 }
 
 model Product {
