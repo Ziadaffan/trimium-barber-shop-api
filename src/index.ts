@@ -6,7 +6,6 @@ import express, { Application, Request, Response } from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { errorHandlerMiddleware } from './api/middlewares/error.handler.middleware';
-import prisma from './packages/lib/db';
 
 dotenv.config();
 
@@ -15,9 +14,10 @@ const PORT = process.env.PORT || 3000;
 
 app.use(helmet());
 app.use(cors());
+
 app.use(morgan('combined'));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 app.get('/', (req: Request, res: Response) => {
   res.redirect('/health');

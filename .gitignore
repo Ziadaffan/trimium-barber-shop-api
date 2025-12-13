@@ -184,3 +184,7 @@ temp/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Uploaded files
+uploads/*
+!uploads/.gitkeep
