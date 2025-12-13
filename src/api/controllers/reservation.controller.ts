@@ -51,12 +51,10 @@ export const getAvailableTimes = async (req: Request, res: Response, next: NextF
       startOfDayLocal.getDay()
     ];
 
-    const barberSchedule = await prisma.barberSchedule.findUnique({
+    const barberSchedule = await prisma.barberSchedule.findFirst({
       where: {
-        barberId_dayOfWeek: {
-          barberId,
-          dayOfWeek: dayOfWeek as any,
-        },
+        barberId,
+        dayOfWeek: dayOfWeek as any,
       },
     });
 
