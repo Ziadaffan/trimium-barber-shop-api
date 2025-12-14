@@ -32,7 +32,7 @@ export const getAvailableTimes = async (req: Request, res: Response, next: NextF
       return;
     }
 
-    const serviceDuration = service.duration; // Duration in minutes
+    const serviceDuration = service.duration;
 
     const canadaTimezone = 'America/Toronto';
 
@@ -51,14 +51,15 @@ export const getAvailableTimes = async (req: Request, res: Response, next: NextF
       startOfDayLocal.getDay()
     ];
 
-    const barberSchedule = await prisma.barberSchedule.findFirst({
+    const barberSchedules = await prisma.barberSchedule.findMany({
       where: {
         barberId,
         dayOfWeek: dayOfWeek as any,
+        isActive: true,
       },
     });
 
-    if (!barberSchedule || !barberSchedule.isActive) {
+    if (!barberSchedules || barberSchedules.length === 0) {
       res.status(200).json({
         message: 'No available times',
         availableTimes: [],
@@ -69,27 +70,32 @@ export const getAvailableTimes = async (req: Request, res: Response, next: NextF
       return;
     }
 
-    const [startHourStr, startMinStr] = barberSchedule.startTime.split(':');
-    const [endHourStr, endMinStr] = barberSchedule.endTime.split(':');
-    const startHour = parseInt(startHourStr);
-    const startMin = parseInt(startMinStr || '0');
-    const endHour = parseInt(endHourStr);
-    const endMin = parseInt(endMinStr || '0');
+    const allTimes: string[] = [];
 
-    // Calculate total minutes for start and end
-    const startTotalMinutes = startHour * 60 + startMin;
-    const endTotalMinutes = endHour * 60 + endMin;
+    for (const schedule of barberSchedules) {
+      const [startHourStr, startMinStr] = schedule.startTime.split(':');
+      const [endHourStr, endMinStr] = schedule.endTime.split(':');
+      const startHour = parseInt(startHourStr);
+      const startMin = parseInt(startMinStr || '0');
+      const endHour = parseInt(endHourStr);
+      const endMin = parseInt(endMinStr || '0');
 
-    // Generate all possible time slots based on service duration
-    const allTimes = [];
-    for (let minutes = startTotalMinutes; minutes + serviceDuration <= endTotalMinutes; minutes += 30) {
-      // 30-minute intervals
-      const hour = Math.floor(minutes / 60);
-      const min = minutes % 60;
-      allTimes.push(`${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`);
+      const startTotalMinutes = startHour * 60 + startMin;
+      const endTotalMinutes = endHour * 60 + endMin;
+
+      for (let minutes = startTotalMinutes; minutes + serviceDuration <= endTotalMinutes; minutes += 30) {
+        const hour = Math.floor(minutes / 60);
+        const min = minutes % 60;
+        const timeSlot = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
+
+        if (!allTimes.includes(timeSlot)) {
+          allTimes.push(timeSlot);
+        }
+      }
     }
 
-    // Get existing reservations
+    allTimes.sort();
+
     const existingReservations = await prisma.reservation.findMany({
       where: {
         barberId,
@@ -106,7 +112,6 @@ export const getAvailableTimes = async (req: Request, res: Response, next: NextF
       },
     });
 
-    // Create a set of occupied time slots
     const occupiedSlots = new Set<string>();
 
     existingReservations.forEach(reservation => {
@@ -114,7 +119,6 @@ export const getAvailableTimes = async (req: Request, res: Response, next: NextF
       const reservationStartMinutes = reservationDateCanada.getHours() * 60 + reservationDateCanada.getMinutes();
       const reservationDuration = reservation.service.duration;
 
-      // Mark all 30-minute slots occupied by this reservation
       for (let min = reservationStartMinutes; min < reservationStartMinutes + reservationDuration; min += 30) {
         const hour = Math.floor(min / 60);
         const minute = min % 60;
@@ -122,23 +126,21 @@ export const getAvailableTimes = async (req: Request, res: Response, next: NextF
       }
     });
 
-    // Check which time slots have enough consecutive free time for the service
     const availableTimes = allTimes.filter(timeSlot => {
       const [hourStr, minStr] = timeSlot.split(':');
       const slotStartMinutes = parseInt(hourStr) * 60 + parseInt(minStr);
 
-      // Check if all required 30-minute slots are free
       for (let min = slotStartMinutes; min < slotStartMinutes + serviceDuration; min += 30) {
         const hour = Math.floor(min / 60);
         const minute = min % 60;
         const slot = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
 
         if (occupiedSlots.has(slot)) {
-          return false; // This time slot is not available
+          return false;
         }
       }
 
-      return true; // All required slots are free
+      return true;
     });
 
     res.status(200).json(availableTimes);
@@ -155,7 +157,7 @@ export const getReservations = async (req: Request, res: Response, next: NextFun
         service: true,
       },
       orderBy: {
-        date: 'desc',
+        date: 'asc',
       },
     });
     res.status(200).json(reservations);
@@ -172,25 +174,6 @@ export const createReservation = async (req: Request, res: Response, next: NextF
       return;
     }
 
-    const canadaTimezone = 'America/Toronto';
-
-    const dateTimeString = `${date} ${time}`;
-    let parsedDate = parse(dateTimeString, 'yyyy-MM-dd HH:mm', new Date());
-
-    if (isNaN(parsedDate.getTime())) {
-      parsedDate = parse(dateTimeString, 'yyyy-MM-dd h:mm a', new Date());
-    }
-
-    if (isNaN(parsedDate.getTime())) {
-      throwError(
-        'Invalid date or time format. Expected date in yyyy-MM-dd format and time in HH:mm or h:mm a format',
-        400
-      );
-      return;
-    }
-
-    const utcDate = fromZonedTime(parsedDate, canadaTimezone);
-
     const service = await prisma.service.findUnique({
       where: { id: serviceId },
     });
@@ -204,6 +187,13 @@ export const createReservation = async (req: Request, res: Response, next: NextF
     });
     if (!barber) {
       throwError('Barber not found', 404);
+      return;
+    }
+
+    const utcDate = getReservationTime(date, time);
+
+    if (!utcDate) {
+      throwError('Invalid date or time format', 400);
       return;
     }
 
@@ -256,17 +246,70 @@ export const createReservation = async (req: Request, res: Response, next: NextF
 export const updateReservation = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { date, barberId } = req.body;
+    const { barberId, date, time, clientName, clientPhone, clientEmail, serviceId, status } = req.body;
 
-    if (!date || !barberId) {
-      throwError('Date and barberId are required', 400);
+    if (!barberId || !date || !time || !clientName || !clientPhone || !clientEmail || !serviceId || !status) {
+      throwError('All fields are required', 400);
       return;
     }
 
+    const service = await prisma.service.findUnique({
+      where: { id: serviceId },
+    });
+    if (!service) {
+      throwError('Service not found', 404);
+      return;
+    }
+
+    const barber = await prisma.barber.findUnique({
+      where: { id: barberId },
+    });
+    if (!barber) {
+      throwError('Barber not found', 404);
+      return;
+    }
+
+    const utcDate = getReservationTime(date, time);
+
+    if (!utcDate) {
+      throwError('Invalid date or time format', 400);
+      return;
+    }
+
+    const existingReservation = await prisma.reservation.findFirst({
+      where: {
+        date: utcDate,
+        barberId,
+        id: {
+          not: id,
+        },
+      },
+    });
+
+    if (existingReservation) {
+      throwError('Reservation already exists', 400);
+      return;
+    }
+
+    const data = {
+      barberId,
+      date: utcDate,
+      status: status as ReservationStatus,
+      clientName,
+      clientPhone,
+      clientEmail,
+      serviceId: service.id,
+    };
+
     const reservation = await prisma.reservation.update({
       where: { id },
-      data: { date, barberId },
+      data,
     });
+
+    if (!reservation) {
+      throwError('Failed to update reservation', 400);
+      return;
+    }
 
     res.status(200).json(reservation);
   } catch (error) {
@@ -296,4 +339,26 @@ export const deleteReservation = async (req: Request, res: Response, next: NextF
   } catch (error) {
     next(error);
   }
+};
+
+const getReservationTime = (date: string, time: string) => {
+  const canadaTimezone = 'America/Toronto';
+
+  const dateTimeString = `${date} ${time}`;
+  let parsedDate = parse(dateTimeString, 'yyyy-MM-dd HH:mm', new Date());
+
+  if (isNaN(parsedDate.getTime())) {
+    parsedDate = parse(dateTimeString, 'yyyy-MM-dd h:mm a', new Date());
+  }
+
+  if (isNaN(parsedDate.getTime())) {
+    throwError(
+      'Invalid date or time format. Expected date in yyyy-MM-dd format and time in HH:mm or h:mm a format',
+      400
+    );
+    return null;
+  }
+
+  const utcDate = fromZonedTime(parsedDate, canadaTimezone);
+  return utcDate;
 };

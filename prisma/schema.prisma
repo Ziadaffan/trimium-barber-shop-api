@@ -37,6 +37,7 @@ model Barber {
     phone            String
     googleCalendarId String?
     imageUrl         String?
+    cloudinaryId     String?
 
     Reservation Reservation[]
     schedules   BarberSchedule[]
