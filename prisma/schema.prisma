@@ -13,12 +13,6 @@ enum ReservationStatus {
     CANCELLED
 }
 
-enum ServiceType {
-    HAIRCUT
-    BEARD_TRIM
-    SHAVING
-    OTHER
-}
 
 enum DayOfWeek {
     MONDAY
@@ -64,19 +58,18 @@ model Reservation {
     updatedAt DateTime @updatedAt
 
     @@unique([date, barberId])
-    
 }
 
 model Service {
-    id           String        @id @default(uuid())
-    type         ServiceType   @unique
+    id           String   @id @default(uuid())
+    type         String
     nameEn       String
     nameFr       String
     description  String?
-    price        Float         @default(0)
-    duration     Int           @default(60) // In minutes
-    isPremium    Boolean       @default(false)
-    isActive     Boolean       @default(true)
+    price        Float    @default(0)
+    duration     Int      @default(60) // In minutes
+    isPremium    Boolean  @default(false)
+    isActive     Boolean  @default(true)
     reservations Reservation[]
 
     createdAt DateTime @default(now())
@@ -99,15 +92,15 @@ model BarberSchedule {
 }
 
 model Product {
-    id          String   @id @default(uuid())
-    name        String
-    price       Float
-    description String
-    image       String
+    id           String   @id @default(uuid())
+    name         String
+    price        Float
+    description  String
+    image        String
     cloudinaryId String
-    isActive    Boolean  @default(true)
-    createdAt   DateTime @default(now())
-    updatedAt   DateTime @updatedAt
+    isActive     Boolean  @default(true)
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
 }
 
 model GoogleCalendarToken {
@@ -131,9 +124,10 @@ model Comment {
 }
 
 model Gallery {
-    id        String   @id @default(uuid())
-    image     String
-    position  Int
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+    id           String   @id @default(uuid())
+    cloudinaryId String
+    image        String
+    position     Int
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
 }

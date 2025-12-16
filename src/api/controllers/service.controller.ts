@@ -1,35 +1,15 @@
 import prisma from '../../packages/lib/db';
-import { ServiceType } from '@prisma/client';
 import { NextFunction, Request, Response } from 'express';
-
-interface GetServicesResponse {
-  id: string;
-  type: ServiceType;
-  description: string;
-  price: number;
-  duration: number;
-  isPremium: boolean;
-}
+import { throwError } from '../../packages/common/utils/error.handler.utils';
 
 export const getServices = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    let { language } = req.query;
+    const { evenNotActive } = req.query;
+    const services = await prisma.service.findMany({
+      where: { isActive: evenNotActive === 'true' ? undefined : true },
+    });
 
-    if (!language) {
-      language = 'fr';
-    }
-    const services = await prisma.service.findMany({ where: { isActive: true } });
-
-    const formattedServices: GetServicesResponse[] = services.map((service: any) => ({
-      id: service.id,
-      type: service.type,
-      description: service.description,
-      price: service.price,
-      duration: service.duration,
-      isPremium: service.isPremium,
-    }));
-
-    res.status(200).json(formattedServices);
+    res.status(200).json(services);
   } catch (error) {
     next(error);
   }
@@ -37,16 +17,27 @@ export const getServices = async (req: Request, res: Response, next: NextFunctio
 
 export const createService = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { type, nameEn, nameFr } = req.body;
-    const service = await prisma.service.create({
-      data: { type, nameEn, nameFr },
-    });
+    const { type, nameEn, nameFr, description, price, duration, isPremium, isActive } = req.body;
 
-    if (!service) {
-      throw new Error('Failed to create service');
+    if (!type || !nameEn || !nameFr || !description || !price || !duration) {
+      throwError('All fields are required', 400);
+      return;
     }
 
-    res.status(201).send();
+    const service = await prisma.service.create({
+      data: {
+        type,
+        nameEn,
+        nameFr,
+        description,
+        price: parseFloat(price),
+        duration: parseInt(duration),
+        isPremium,
+        isActive,
+      },
+    });
+
+    res.status(201).json(service);
   } catch (error) {
     next(error);
   }
@@ -55,17 +46,36 @@ export const createService = async (req: Request, res: Response, next: NextFunct
 export const updateService = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { type, nameEn, nameFr } = req.body;
-    const service = await prisma.service.update({
-      where: { id },
-      data: { type, nameEn, nameFr },
-    });
+    const { type, nameEn, nameFr, description, price, duration, isPremium, isActive } = req.body;
 
-    if (!service) {
-      throw new Error('Failed to update service');
+    if (!type || !nameEn || !nameFr || !description || !price || !duration) {
+      throwError('All fields are required', 400);
+      return;
     }
 
-    res.status(200).send();
+    const service = await prisma.service.findUnique({
+      where: { id },
+    });
+    if (!service) {
+      throwError('Service not found', 404);
+      return;
+    }
+
+    const updatedService = await prisma.service.update({
+      where: { id },
+      data: {
+        type,
+        nameEn,
+        nameFr,
+        description,
+        price: parseFloat(price),
+        duration: parseInt(duration),
+        isPremium,
+        isActive,
+      },
+    });
+
+    res.status(200).json(updatedService);
   } catch (error) {
     next(error);
   }
@@ -74,15 +84,26 @@ export const updateService = async (req: Request, res: Response, next: NextFunct
 export const deleteService = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const service = await prisma.service.delete({
+
+    if (!id) {
+      throwError('Service ID is required', 400);
+      return;
+    }
+
+    const service = await prisma.service.findUnique({
       where: { id },
     });
 
     if (!service) {
-      throw new Error('Failed to delete service');
+      throwError('Service not found', 404);
+      return;
     }
 
-    res.status(204).send();
+    const deletedService = await prisma.service.delete({
+      where: { id },
+    });
+
+    res.status(204).json(deletedService);
   } catch (error) {
     next(error);
   }
