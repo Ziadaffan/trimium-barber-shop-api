@@ -20,7 +20,7 @@ export const getBarbers = async (req: Request, res: Response, next: NextFunction
 
 export const createBarber = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, email, phone, googleCalendarId, imageUrl } = req.body;
+    const { name, email, phone, imageUrl } = req.body;
     const file = req.file as Express.Multer.File;
 
     if (!name || !email || !phone) {
@@ -47,7 +47,6 @@ export const createBarber = async (req: Request, res: Response, next: NextFuncti
       name: name.trim().toLowerCase(),
       email: email.trim().toLowerCase(),
       phone: phone.trim().toLowerCase(),
-      googleCalendarId,
       imageUrl: secure_url,
       cloudinaryId: public_id,
     };
@@ -64,7 +63,7 @@ export const createBarber = async (req: Request, res: Response, next: NextFuncti
 export const updateBarber = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { name, email, phone, googleCalendarId, imageUrl } = req.body;
+    const { name, email, phone, imageUrl } = req.body;
     const file = req.file as Express.Multer.File;
 
     console.log(file);
@@ -74,7 +73,7 @@ export const updateBarber = async (req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    if (!name || !email || !phone || !googleCalendarId) {
+    if (!name || !email || !phone) {
       throwError('All fields are required', 400);
       return;
     }
@@ -115,7 +114,7 @@ export const updateBarber = async (req: Request, res: Response, next: NextFuncti
 
     const updatedBarber = await prisma.barber.update({
       where: { id },
-      data: { name, email, phone, googleCalendarId, imageUrl: secure_url },
+      data: { name, email, phone, imageUrl: secure_url },
     });
     res.status(200).json(updatedBarber);
   } catch (error) {

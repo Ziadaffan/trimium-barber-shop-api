@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { Reservation, Service } from '@prisma/client';
+import { Service } from '@prisma/client';
 import { throwError } from '../common/utils/error.handler.utils';
 import prisma from '../lib/db';
 
@@ -20,7 +20,7 @@ export const oAuth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_REDIRECT_URI
 );
 
-export const getAuthUrl = (): string => {
+export const getAuthUrl = (barberId: string): string => {
   const redirectUri = process.env.GOOGLE_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URL;
 
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !redirectUri) {
@@ -34,6 +34,7 @@ export const getAuthUrl = (): string => {
     access_type: 'offline',
     prompt: 'consent',
     scope: SCOPES,
+    state: barberId,
   });
 
   return url;
@@ -49,70 +50,30 @@ export const getTokensFromCode = async (code: string) => {
   }
 };
 
-export const setCredentials = (tokens: any) => {
-  oAuth2Client.setCredentials(tokens);
+const attachTokenPersistor = (oAuth2Client: any, barberId: string) => {
+  oAuth2Client.on('tokens', async (newTokens: any) => {
+    const tokenUpdate: any = {};
+    if (newTokens.access_token) tokenUpdate.accessToken = newTokens.access_token;
+    if (newTokens.expiry_date) tokenUpdate.expiryDate = BigInt(newTokens.expiry_date);
+    if (newTokens.refresh_token) tokenUpdate.refreshToken = newTokens.refresh_token;
 
-  oAuth2Client.on('tokens', async newTokens => {
-    const calendarId = process.env.GOOGLE_CLIENT_ID;
-    if (!calendarId) {
-      console.error('GOOGLE_CLIENT_ID is not set, cannot update tokens');
-      return;
-    }
+    if (Object.keys(tokenUpdate).length === 0) return;
 
-    if (newTokens.refresh_token) {
-      await prisma.googleCalendarToken.upsert({
-        where: { calendarId },
-        update: { refreshToken: newTokens.refresh_token },
-        create: {
-          calendarId,
-          refreshToken: newTokens.refresh_token,
-          accessToken: newTokens.access_token || '',
-          expiryDate: newTokens.expiry_date ? BigInt(newTokens.expiry_date) : BigInt(0),
-        },
-      });
-    }
-
-    if (newTokens.access_token && newTokens.expiry_date) {
-      const token = await prisma.googleCalendarToken.upsert({
-        where: { calendarId },
-        update: {
-          accessToken: newTokens.access_token,
-          expiryDate: BigInt(newTokens.expiry_date),
-        },
-        create: {
-          calendarId,
-          accessToken: newTokens.access_token,
-          refreshToken: newTokens.refresh_token || '',
-          expiryDate: BigInt(newTokens.expiry_date),
-        },
-      });
-      console.log('token', token);
-    }
+    await prisma.barberGoogleToken.update({
+      where: { barberId },
+      data: tokenUpdate,
+    });
   });
 };
 
-export const getStoredTokens = async () => {
-  const token = await prisma.googleCalendarToken.findUnique({ where: { calendarId: process.env.GOOGLE_CLIENT_ID } });
-
-  if (!token) {
-    console.error('Google Calendar tokens not found in database.');
-    return null;
-  }
-
-  const accessToken = token.accessToken;
-  const refreshToken = token.refreshToken;
-  const expiryDate = token.expiryDate;
-
-  if (!accessToken || !refreshToken) {
-    console.error('Google Calendar tokens not found in environment variables.');
-    console.error('Required: GOOGLE_ACCESS_TOKEN, GOOGLE_REFRESH_TOKEN');
-    return null;
-  }
+export const getStoredTokensForBarber = async (barberId: string) => {
+  const token = await prisma.barberGoogleToken.findUnique({ where: { barberId } });
+  if (!token) return null;
 
   return {
-    access_token: accessToken,
-    refresh_token: refreshToken,
-    expiry_date: expiryDate ? expiryDate.toString() : undefined,
+    access_token: token.accessToken,
+    refresh_token: token.refreshToken,
+    expiry_date: token.expiryDate ? Number(token.expiryDate) : undefined,
   };
 };
 
@@ -125,19 +86,6 @@ export const addReservationToGoogleCalendar = async ({
   date,
 }: AddReservationToGoogleCalendarProps) => {
   try {
-    const storedTokens = await getStoredTokens();
-
-    if (storedTokens) {
-      setCredentials(storedTokens);
-    } else {
-      const currentCredentials = oAuth2Client.credentials;
-
-      if (!currentCredentials.access_token && !currentCredentials.refresh_token) {
-        throwError('Google Calendar not authorized', 401);
-        return;
-      }
-    }
-
     const barber = await prisma.barber.findUnique({
       where: { id: barberId },
     });
@@ -146,7 +94,22 @@ export const addReservationToGoogleCalendar = async ({
       return;
     }
 
-    const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
+    const storedTokens = await getStoredTokensForBarber(barberId);
+    if (!storedTokens) {
+      throwError(`Barber Google Calendar not authorized. Please connect at /api/google/auth?barberId=${barberId}`, 401);
+      return;
+    }
+
+    // Use a per-call OAuth2 client so credentials don't leak between barbers
+    const barberOAuth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URL
+    );
+    attachTokenPersistor(barberOAuth2Client, barberId);
+    barberOAuth2Client.setCredentials(storedTokens);
+
+    const calendar = google.calendar({ version: 'v3', auth: barberOAuth2Client });
 
     const endDate = new Date(date);
     endDate.setMinutes(endDate.getMinutes() + service.duration);
@@ -164,13 +127,8 @@ export const addReservationToGoogleCalendar = async ({
       },
     };
 
-    if (!barber.googleCalendarId) {
-      throwError('Barber Google Calendar ID is not set', 400);
-      return;
-    }
-
     const response = await calendar.events.insert({
-      calendarId: barber.googleCalendarId,
+      calendarId: 'primary',
       requestBody: event,
     });
 
@@ -182,7 +140,10 @@ export const addReservationToGoogleCalendar = async ({
     }
   } catch (error: any) {
     if (error.code === 401 || error.message?.includes('invalid_grant')) {
-      throwError('Google Calendar authorization expired. Please re-authorize at /api/google/auth', 401);
+      throwError(
+        `Google Calendar authorization expired. Please re-authorize at /api/google/auth?barberId=${barberId}`,
+        401
+      );
     } else {
       throwError(`Failed to create reservation in Google Calendar: ${error.message || 'Unknown error'}`, 400);
     }

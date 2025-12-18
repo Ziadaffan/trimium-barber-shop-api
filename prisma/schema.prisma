@@ -29,12 +29,12 @@ model Barber {
     name             String
     email            String  @unique
     phone            String
-    googleCalendarId String?
     imageUrl         String?
     cloudinaryId     String?
 
     Reservation Reservation[]
     schedules   BarberSchedule[]
+    googleToken BarberGoogleToken?
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
@@ -106,6 +106,18 @@ model Product {
 model GoogleCalendarToken {
     id           String @id @default(uuid())
     calendarId   String @unique
+    accessToken  String
+    refreshToken String
+    expiryDate   BigInt
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model BarberGoogleToken {
+    id           String @id @default(uuid())
+    barberId     String @unique
+    barber       Barber @relation(fields: [barberId], references: [id], onDelete: Cascade)
     accessToken  String
     refreshToken String
     expiryDate   BigInt
