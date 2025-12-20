@@ -17,9 +17,9 @@ export const getServices = async (req: Request, res: Response, next: NextFunctio
 
 export const createService = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { type, nameEn, nameFr, description, price, duration, isPremium, isActive } = req.body;
+    const { type, nameEn, nameFr, descriptionEn, descriptionFr, price, duration, isPremium, isActive } = req.body;
 
-    if (!type || !nameEn || !nameFr || !description || !price || !duration) {
+    if (!type || !nameEn || !nameFr || !descriptionEn || !descriptionFr || !price || !duration) {
       throwError('All fields are required', 400);
       return;
     }
@@ -29,7 +29,8 @@ export const createService = async (req: Request, res: Response, next: NextFunct
         type,
         nameEn,
         nameFr,
-        description,
+        descriptionEn,
+        descriptionFr,
         price: parseFloat(price),
         duration: parseInt(duration),
         isPremium,
@@ -46,9 +47,9 @@ export const createService = async (req: Request, res: Response, next: NextFunct
 export const updateService = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { type, nameEn, nameFr, description, price, duration, isPremium, isActive } = req.body;
+    const { type, nameEn, nameFr, descriptionEn, descriptionFr, price, duration, isPremium, isActive } = req.body;
 
-    if (!type || !nameEn || !nameFr || !description || !price || !duration) {
+    if (!type || !nameEn || !nameFr || !descriptionEn || !descriptionFr || !price || !duration) {
       throwError('All fields are required', 400);
       return;
     }
@@ -67,7 +68,8 @@ export const updateService = async (req: Request, res: Response, next: NextFunct
         type,
         nameEn,
         nameFr,
-        description,
+        descriptionEn,
+        descriptionFr,
         price: parseFloat(price),
         duration: parseInt(duration),
         isPremium,

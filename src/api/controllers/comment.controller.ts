@@ -20,3 +20,24 @@ export const createComment = async (req: Request, res: Response, next: NextFunct
     next(error);
   }
 };
+
+export const getComments = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const comments = await prisma.comment.findMany();
+    res.status(200).json(comments);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteComment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    await prisma.comment.delete({
+      where: { id },
+    });
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+};

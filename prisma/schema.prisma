@@ -13,7 +13,6 @@ enum ReservationStatus {
     CANCELLED
 }
 
-
 enum DayOfWeek {
     MONDAY
     TUESDAY
@@ -24,16 +23,22 @@ enum DayOfWeek {
     SUNDAY
 }
 
+enum BarberTimeOffType {
+    VACATION
+    BLOCK
+}
+
 model Barber {
-    id               String  @id @default(uuid())
-    name             String
-    email            String  @unique
-    phone            String
-    imageUrl         String?
-    cloudinaryId     String?
+    id           String  @id @default(uuid())
+    name         String
+    email        String  @unique
+    phone        String
+    imageUrl     String?
+    cloudinaryId String?
 
     Reservation Reservation[]
     schedules   BarberSchedule[]
+    timeOffs    BarberTimeOff[]
     googleToken BarberGoogleToken?
 
     createdAt DateTime @default(now())
@@ -45,6 +50,7 @@ model Reservation {
     barberId String
     barber   Barber            @relation(fields: [barberId], references: [id], onDelete: Cascade)
     date     DateTime
+    endDate  DateTime
     status   ReservationStatus @default(PENDING)
 
     clientName  String
@@ -61,15 +67,16 @@ model Reservation {
 }
 
 model Service {
-    id           String   @id @default(uuid())
+    id           String        @id @default(uuid())
     type         String
     nameEn       String
     nameFr       String
-    description  String?
-    price        Float    @default(0)
-    duration     Int      @default(60) // In minutes
-    isPremium    Boolean  @default(false)
-    isActive     Boolean  @default(true)
+    descriptionEn String?
+    descriptionFr String?
+    price        Float         @default(0)
+    duration     Int           @default(60) // In minutes
+    isPremium    Boolean       @default(false)
+    isActive     Boolean       @default(true)
     reservations Reservation[]
 
     createdAt DateTime @default(now())
@@ -91,16 +98,35 @@ model BarberSchedule {
     @@unique([barberId, dayOfWeek, startTime, endTime])
 }
 
+model BarberTimeOff {
+    id       String @id @default(uuid())
+    barberId String
+    barber   Barber @relation(fields: [barberId], references: [id], onDelete: Cascade)
+
+    startAt  DateTime
+    endAt    DateTime
+    type     BarberTimeOffType @default(VACATION)
+    note     String?
+    isActive Boolean           @default(true)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([barberId, startAt, endAt])
+}
+
 model Product {
-    id           String   @id @default(uuid())
-    name         String
-    price        Float
-    description  String
-    image        String
-    cloudinaryId String
-    isActive     Boolean  @default(true)
-    createdAt    DateTime @default(now())
-    updatedAt    DateTime @updatedAt
+    id            String   @id @default(uuid())
+    nameEn        String
+    nameFr        String
+    price         Float
+    descriptionEn String?
+    descriptionFr String?
+    image         String
+    cloudinaryId  String
+    isActive      Boolean  @default(true)
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
 }
 
 model GoogleCalendarToken {

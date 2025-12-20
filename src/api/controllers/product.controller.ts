@@ -23,10 +23,10 @@ export const getProducts = async (req: Request, res: Response, next: NextFunctio
 
 export const createProduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, price, description } = req.body;
+    const { nameEn, nameFr, price, descriptionEn, descriptionFr } = req.body;
     const file = req.file as Express.Multer.File;
 
-    if (!name || !price || !description) {
+    if (!nameEn || !nameFr || !price || !descriptionEn || !descriptionFr) {
       throwError('Name, price, and description are required', 400);
     }
 
@@ -38,9 +38,11 @@ export const createProduct = async (req: Request, res: Response, next: NextFunct
 
     const product = await prisma.product.create({
       data: {
-        name,
+        nameEn,
+        nameFr,
         price: parseFloat(price),
-        description,
+        descriptionEn,
+        descriptionFr,
         image: secure_url,
         cloudinaryId: public_id,
       },
@@ -55,10 +57,10 @@ export const createProduct = async (req: Request, res: Response, next: NextFunct
 export const updateProduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { name, price, description } = req.body;
+    const { nameEn, nameFr, price, descriptionEn, descriptionFr } = req.body;
     const file = req.file as Express.Multer.File;
 
-    if (!name || !price || !description) {
+    if (!nameEn || !nameFr || !price || !descriptionEn || !descriptionFr) {
       throwError('Name, price, and description are required', 400);
     }
 
@@ -72,15 +74,19 @@ export const updateProduct = async (req: Request, res: Response, next: NextFunct
     }
 
     const updateData: {
-      name: string;
+      nameEn: string;
+      nameFr: string;
       price: number;
-      description: string;
+      descriptionEn: string;
+      descriptionFr: string;
       image?: string;
       cloudinaryId?: string;
     } = {
-      name,
+      nameEn,
+      nameFr,
       price: parseFloat(price),
-      description,
+      descriptionEn,
+      descriptionFr,
     };
 
     if (file) {
