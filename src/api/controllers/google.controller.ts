@@ -78,10 +78,7 @@ export const handleGoogleCallback = async (req: Request, res: Response, next: Ne
       },
     });
 
-    res.status(200).json({
-      message: '✅ Google Calendar authorized successfully!',
-      barberId,
-    });
+    res.redirect(`${process.env.ADMIN_WEB_APP_URL}/barbers`);
   } catch (error) {
     next(error);
   }
