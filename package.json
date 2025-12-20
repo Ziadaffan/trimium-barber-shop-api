@@ -4,6 +4,7 @@
   "description": "Express API for Trimium Barber Shop",
   "main": "dist/index.js",
   "scripts": {
+    "postinstall": "prisma generate",
     "build": "rimraf dist && tsc && tsc-alias -p tsconfig.json -f --outDir dist",
     "start": "node dist/index.js",
     "dev": "dotenv -e .env.local -- ts-node-dev --respawn --transpile-only src/index.ts",
