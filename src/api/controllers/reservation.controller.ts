@@ -1,17 +1,16 @@
 import { NextFunction, Request, Response } from 'express';
 import prisma from '../../packages/lib/db';
 import { ReservationStatus } from '@prisma/client';
-import { format } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { throwError } from '../../packages/common/utils/error.handler.utils';
 import { addReservationToGoogleCalendar } from '../../packages/google/oAuth2Client';
 import {
   CANADA_TIMEZONE,
   SLOT_MINUTES,
-  getReservationTimeUTC,
   minutesToTime,
   parseTimeToMinutes,
 } from '../../packages/common/utils/reservation-time.utils';
+import { isValidReservationStatus, parseReservationStartEnd } from '../../packages/common/utils/reservation.utils';
 
 export const getAvailableTimes = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -115,12 +114,15 @@ export const getAvailableTimes = async (req: Request, res: Response, next: NextF
       const reservationStartMinutes = reservationDateCanada.getHours() * 60 + reservationDateCanada.getMinutes();
       const reservationDuration = reservation.service.duration;
 
-      for (let min = reservationStartMinutes; min < reservationStartMinutes + reservationDuration; min += SLOT_MINUTES) {
+      for (
+        let min = reservationStartMinutes;
+        min < reservationStartMinutes + reservationDuration;
+        min += SLOT_MINUTES
+      ) {
         occupiedSlots.add(minutesToTime(min));
       }
     });
 
-    // Block out vacations / time off
     const timeOffs = await prisma.barberTimeOff.findMany({
       where: {
         barberId,
@@ -185,8 +187,9 @@ export const getReservations = async (req: Request, res: Response, next: NextFun
 
 export const createReservation = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { barberId, date, time, clientName, clientPhone, clientEmail, serviceId } = req.body;
-    if (!barberId || !date || !time || !clientName || !clientPhone || !clientEmail || !serviceId) {
+    const { barberId, date, time, endDate, clientName, clientPhone, clientEmail, serviceId, status } = req.body;
+
+    if (!barberId || !date || !clientName || !clientPhone || !clientEmail || !serviceId) {
       throwError('All fields are required', 400);
       return;
     }
@@ -207,25 +210,30 @@ export const createReservation = async (req: Request, res: Response, next: NextF
       return;
     }
 
-    const utcDate = getReservationTime(date, time);
+    const { utcStart, utcEnd } = parseReservationStartEnd({
+      date,
+      time,
+      endDate,
+      serviceDurationMinutes: service.duration,
+    });
 
-    if (!utcDate) {
-      throwError('Invalid date or time format', 400);
+    if (!utcStart || !utcEnd) {
+      throwError('Invalid date/time/endDate format', 400);
       return;
     }
 
-    const utcEndDate = new Date(utcDate.getTime() + service.duration * 60_000);
-
-    // Validate requested interval is inside weekly schedule
-    const localStart = toZonedTime(utcDate, CANADA_TIMEZONE);
-    const dayOfWeek = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'][localStart.getDay()];
+    const localStart = toZonedTime(utcStart, CANADA_TIMEZONE);
+    const dayOfWeek = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'][
+      localStart.getDay()
+    ];
 
     const schedules = await prisma.barberSchedule.findMany({
       where: { barberId, dayOfWeek: dayOfWeek as any, isActive: true },
     });
 
     const localStartMinutes = localStart.getHours() * 60 + localStart.getMinutes();
-    const localEndMinutes = localStartMinutes + service.duration;
+    const localEnd = toZonedTime(utcEnd, CANADA_TIMEZONE);
+    const localEndMinutes = localEnd.getHours() * 60 + localEnd.getMinutes();
 
     const fitsSomeSchedule = schedules.some(s => {
       const sStart = parseTimeToMinutes(s.startTime);
@@ -238,13 +246,12 @@ export const createReservation = async (req: Request, res: Response, next: NextF
       return;
     }
 
-    // Reject if barber is in vacation/time-off
     const overlappingTimeOff = await prisma.barberTimeOff.findFirst({
       where: {
         barberId,
         isActive: true,
-        startAt: { lt: utcEndDate },
-        endAt: { gt: utcDate },
+        startAt: { lt: utcEnd },
+        endAt: { gt: utcStart },
       },
     });
 
@@ -253,9 +260,16 @@ export const createReservation = async (req: Request, res: Response, next: NextF
       return;
     }
 
-    // Prevent overlaps (not just same start time)
     const startOfDayLocal = new Date(localStart.getFullYear(), localStart.getMonth(), localStart.getDate(), 0, 0, 0, 0);
-    const endOfDayLocal = new Date(localStart.getFullYear(), localStart.getMonth(), localStart.getDate(), 23, 59, 59, 999);
+    const endOfDayLocal = new Date(
+      localStart.getFullYear(),
+      localStart.getMonth(),
+      localStart.getDate(),
+      23,
+      59,
+      59,
+      999
+    );
     const startOfDayUTC = fromZonedTime(startOfDayLocal, CANADA_TIMEZONE);
     const endOfDayUTC = fromZonedTime(endOfDayLocal, CANADA_TIMEZONE);
 
@@ -271,7 +285,7 @@ export const createReservation = async (req: Request, res: Response, next: NextF
     const overlaps = existingReservations.some(r => {
       const rStart = r.date;
       const rEnd = (r as any).endDate ? (r as any).endDate : new Date(r.date.getTime() + r.service.duration * 60_000);
-      return rStart < utcEndDate && rEnd > utcDate;
+      return rStart < utcEnd && rEnd > utcStart;
     });
 
     if (overlaps) {
@@ -281,9 +295,9 @@ export const createReservation = async (req: Request, res: Response, next: NextF
 
     const data = {
       barberId,
-      date: utcDate,
-      endDate: utcEndDate,
-      status: ReservationStatus.PENDING,
+      date: utcStart,
+      endDate: utcEnd,
+      status: isValidReservationStatus(status) ? (status as ReservationStatus) : ReservationStatus.PENDING,
       clientName,
       clientPhone,
       clientEmail,
@@ -296,7 +310,7 @@ export const createReservation = async (req: Request, res: Response, next: NextF
       clientPhone,
       clientEmail,
       service: service,
-      date: utcDate,
+      date: utcStart,
     });
 
     const reservation = await prisma.reservation.create({
@@ -317,10 +331,15 @@ export const createReservation = async (req: Request, res: Response, next: NextF
 export const updateReservation = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { barberId, date, time, clientName, clientPhone, clientEmail, serviceId, status } = req.body;
+    const { barberId, date, time, endDate, clientName, clientPhone, clientEmail, serviceId, status } = req.body;
 
-    if (!barberId || !date || !time || !clientName || !clientPhone || !clientEmail || !serviceId || !status) {
+    if (!barberId || !date || !clientName || !clientPhone || !clientEmail || !serviceId || !status) {
       throwError('All fields are required', 400);
+      return;
+    }
+
+    if (!isValidReservationStatus(status)) {
+      throwError('Invalid reservation status', 400);
       return;
     }
 
@@ -340,25 +359,31 @@ export const updateReservation = async (req: Request, res: Response, next: NextF
       return;
     }
 
-    const utcDate = getReservationTime(date, time);
+    const { utcStart, utcEnd } = parseReservationStartEnd({
+      date,
+      time,
+      endDate,
+      serviceDurationMinutes: service.duration,
+    });
 
-    if (!utcDate) {
-      throwError('Invalid date or time format', 400);
+    if (!utcStart || !utcEnd) {
+      throwError('Invalid date/time/endDate format', 400);
       return;
     }
 
-    const utcEndDate = new Date(utcDate.getTime() + service.duration * 60_000);
-
     // Validate requested interval is inside weekly schedule
-    const localStart = toZonedTime(utcDate, CANADA_TIMEZONE);
-    const dayOfWeek = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'][localStart.getDay()];
+    const localStart = toZonedTime(utcStart, CANADA_TIMEZONE);
+    const dayOfWeek = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'][
+      localStart.getDay()
+    ];
 
     const schedules = await prisma.barberSchedule.findMany({
       where: { barberId, dayOfWeek: dayOfWeek as any, isActive: true },
     });
 
     const localStartMinutes = localStart.getHours() * 60 + localStart.getMinutes();
-    const localEndMinutes = localStartMinutes + service.duration;
+    const localEnd = toZonedTime(utcEnd, CANADA_TIMEZONE);
+    const localEndMinutes = localEnd.getHours() * 60 + localEnd.getMinutes();
 
     const fitsSomeSchedule = schedules.some(s => {
       const sStart = parseTimeToMinutes(s.startTime);
@@ -376,8 +401,8 @@ export const updateReservation = async (req: Request, res: Response, next: NextF
       where: {
         barberId,
         isActive: true,
-        startAt: { lt: utcEndDate },
-        endAt: { gt: utcDate },
+        startAt: { lt: utcEnd },
+        endAt: { gt: utcStart },
       },
     });
 
@@ -388,7 +413,15 @@ export const updateReservation = async (req: Request, res: Response, next: NextF
 
     // Prevent overlaps (not just same start time)
     const startOfDayLocal = new Date(localStart.getFullYear(), localStart.getMonth(), localStart.getDate(), 0, 0, 0, 0);
-    const endOfDayLocal = new Date(localStart.getFullYear(), localStart.getMonth(), localStart.getDate(), 23, 59, 59, 999);
+    const endOfDayLocal = new Date(
+      localStart.getFullYear(),
+      localStart.getMonth(),
+      localStart.getDate(),
+      23,
+      59,
+      59,
+      999
+    );
     const startOfDayUTC = fromZonedTime(startOfDayLocal, CANADA_TIMEZONE);
     const endOfDayUTC = fromZonedTime(endOfDayLocal, CANADA_TIMEZONE);
 
@@ -405,7 +438,7 @@ export const updateReservation = async (req: Request, res: Response, next: NextF
     const overlaps = existingReservations.some(r => {
       const rStart = r.date;
       const rEnd = (r as any).endDate ? (r as any).endDate : new Date(r.date.getTime() + r.service.duration * 60_000);
-      return rStart < utcEndDate && rEnd > utcDate;
+      return rStart < utcEnd && rEnd > utcStart;
     });
 
     if (overlaps) {
@@ -415,8 +448,8 @@ export const updateReservation = async (req: Request, res: Response, next: NextF
 
     const data = {
       barberId,
-      date: utcDate,
-      endDate: utcEndDate,
+      date: utcStart,
+      endDate: utcEnd,
       status: status as ReservationStatus,
       clientName,
       clientPhone,
@@ -462,16 +495,4 @@ export const deleteReservation = async (req: Request, res: Response, next: NextF
   } catch (error) {
     next(error);
   }
-};
-
-const getReservationTime = (date: string, time: string) => {
-  const utcDate = getReservationTimeUTC(date, time);
-  if (!utcDate) {
-    throwError(
-      'Invalid date or time format. Expected date in yyyy-MM-dd format and time in HH:mm or h:mm a format',
-      400
-    );
-    return null;
-  }
-  return utcDate;
 };

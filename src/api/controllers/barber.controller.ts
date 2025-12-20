@@ -66,8 +66,6 @@ export const updateBarber = async (req: Request, res: Response, next: NextFuncti
     const { name, email, phone, imageUrl } = req.body;
     const file = req.file as Express.Multer.File;
 
-    console.log(file);
-
     if (!id) {
       throwError('Id is required', 400);
       return;
