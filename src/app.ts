@@ -9,7 +9,7 @@ import { errorHandlerMiddleware } from './api/middlewares/error.handler.middlewa
 dotenv.config();
 
 const app: Application = express();
-
+const PORT = process.env.PORT || 3000;
 const corsOptions: CorsOptions = {
   origin: (origin, callback) => {
     // Non-browser clients (curl, server-to-server) often don't send Origin
@@ -61,5 +61,11 @@ app.use('*', (req: Request, res: Response) => {
 });
 
 app.use(errorHandlerMiddleware);
+
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server is running at http://localhost:${PORT} in ${process.env.ENV} mode`);
+  });
+}
 
 export default app;
