@@ -4,14 +4,14 @@
   "installCommand": "yarn install",
   "builds": [
     {
-      "src": "api/index.ts",
+      "src": "vercel/index.ts",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "api/index.ts"
+      "dest": "vercel/index.ts"
     }
   ]
 }
