@@ -1,11 +1,17 @@
 {
   "version": 2,
-  "buildCommand": "npx prisma generate && yarn build",
+  "buildCommand": "npx prisma generate",
   "installCommand": "yarn install",
-  "rewrites": [
+  "builds": [
     {
-      "source": "/(.*)",
-      "destination": "/dist/index.js"
+      "src": "src/index.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "src/index.ts"
     }
   ]
 }
