@@ -5,6 +5,7 @@ import express, { type Application, type Request, type Response } from 'express'
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { errorHandlerMiddleware } from './api/middlewares/error.handler.middleware';
+import { logger } from './packages/common/logger';
 
 dotenv.config();
 
@@ -12,16 +13,14 @@ const app: Application = express();
 const PORT = process.env.PORT || 3000;
 const corsOptions: CorsOptions = {
   origin: (origin, callback) => {
-    // Non-browser clients (curl, server-to-server) often don't send Origin
     if (!origin) return callback(null, true);
 
     const configured = process.env.CORS_ORIGINS;
-    // If not configured, allow all origins (keeps current behavior functional)
     if (!configured) return callback(null, true);
 
     const allowed = configured
       .split(',')
-      .map((s) => s.trim())
+      .map(s => s.trim())
       .filter(Boolean);
 
     if (allowed.includes(origin)) return callback(null, true);
@@ -33,10 +32,17 @@ const corsOptions: CorsOptions = {
 
 app.use(helmet());
 app.use(cors(corsOptions));
-// Ensure preflight requests are handled
 app.options('*', cors(corsOptions));
 
-app.use(morgan('combined'));
+app.use(
+  morgan(':method :url :status :response-time ms - :remote-addr - :user-agent', {
+    stream: {
+      write: message => {
+        logger.info(message.trim());
+      },
+    },
+  })
+);
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
