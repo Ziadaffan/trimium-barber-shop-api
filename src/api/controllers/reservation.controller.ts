@@ -1,9 +1,11 @@
 import { NextFunction, Request, Response } from 'express';
 import prisma from '../../packages/lib/db';
-import { ReservationStatus } from '@prisma/client';
+import { PrismaClient, ReservationStatus } from '@prisma/client';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { throwError } from '../../packages/common/utils/error.handler.utils';
 import { addReservationToGoogleCalendar } from '../../packages/google/oAuth2Client';
+import { logger } from '../../packages/common/logger';
+import { sendReservationConfirmationEmail } from '../../packages/email/resend';
 import {
   CANADA_TIMEZONE,
   SLOT_MINUTES,
@@ -304,15 +306,6 @@ export const createReservation = async (req: Request, res: Response, next: NextF
       serviceId: service.id,
     };
 
-    await addReservationToGoogleCalendar({
-      barberId,
-      clientName,
-      clientPhone,
-      clientEmail,
-      service: service,
-      date: utcStart,
-    });
-
     const reservation = await prisma.reservation.create({
       data,
     });
@@ -320,6 +313,34 @@ export const createReservation = async (req: Request, res: Response, next: NextF
     if (!reservation) {
       throwError('Failed to create reservation', 400);
       return;
+    }
+
+    try {
+      await addReservationToGoogleCalendar({
+        barberId,
+        clientName,
+        clientPhone,
+        clientEmail,
+        service: service,
+        date: utcStart,
+      });
+    } catch (err) {
+      logger.error(err as any);
+    }
+
+    try {
+      await sendReservationConfirmationEmail({
+        reservationId: reservation.id,
+        clientName,
+        clientEmail,
+        clientPhone,
+        barberName: barber.name,
+        serviceName: service.nameEn,
+        startAtUtc: reservation.date,
+        endAtUtc: reservation.endDate,
+      });
+    } catch (err) {
+      logger.error(err as any);
     }
 
     res.status(201).json(reservation);
