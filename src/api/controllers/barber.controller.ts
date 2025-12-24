@@ -161,6 +161,10 @@ export const deleteBarber = async (req: Request, res: Response, next: NextFuncti
       await deleteFromCloudinary(barber.cloudinaryId);
     }
 
+    if (barber.googleCalendarId) {
+      await deleteCalendarById(barber.googleCalendarId);
+    }
+
     await prisma.barber.delete({
       where: { id },
     });

@@ -10,7 +10,9 @@ import {
 
 export const getProducts = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const { evenNotActive } = req.query;
     const products = await prisma.product.findMany({
+      where: { isActive: evenNotActive === 'true' ? undefined : true },
       orderBy: {
         createdAt: 'desc',
       },
