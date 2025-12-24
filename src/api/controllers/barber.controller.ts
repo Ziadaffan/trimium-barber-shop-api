@@ -7,6 +7,7 @@ import {
 import { throwError } from '../../packages/common/utils/error.handler.utils';
 import prisma from '../../packages/lib/db';
 import { NextFunction, Request, Response } from 'express';
+import { createBarberCalendar, deleteCalendarById } from '../../packages/google/oAuth2Client';
 
 export const getBarbers = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -20,7 +21,7 @@ export const getBarbers = async (req: Request, res: Response, next: NextFunction
 
 export const createBarber = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, email, phone, imageUrl } = req.body;
+    const { name, email, phone } = req.body;
     const file = req.file as Express.Multer.File;
 
     if (!name || !email || !phone) {
@@ -43,18 +44,38 @@ export const createBarber = async (req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    const data = {
-      name: name.trim().toLowerCase(),
-      email: email.trim().toLowerCase(),
-      phone: phone.trim().toLowerCase(),
-      imageUrl: secure_url,
-      cloudinaryId: public_id,
-    };
+    const normalizedName = name.trim().toLowerCase();
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPhone = phone.trim().toLowerCase();
 
-    const barber = await prisma.barber.create({
-      data,
-    });
-    res.status(201).json(barber);
+    const createdCalendarId = await createBarberCalendar(normalizedName);
+    if (!createdCalendarId) {
+      throwError('Failed to create Google Calendar for barber', 400);
+      return;
+    }
+
+    try {
+      const barber = await prisma.barber.create({
+        data: {
+          name: normalizedName,
+          email: normalizedEmail,
+          phone: normalizedPhone,
+          imageUrl: secure_url,
+          cloudinaryId: public_id,
+          googleCalendarId: createdCalendarId,
+        },
+      });
+
+      res.status(201).json(barber);
+    } catch (error) {
+      if (public_id) {
+        await deleteFromCloudinary(public_id).catch(() => undefined);
+      }
+      if (createdCalendarId) {
+        await deleteCalendarById(createdCalendarId);
+      }
+      throw error;
+    }
   } catch (error) {
     next(error);
   }
@@ -63,7 +84,7 @@ export const createBarber = async (req: Request, res: Response, next: NextFuncti
 export const updateBarber = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { name, email, phone, imageUrl } = req.body;
+    const { name, email, phone } = req.body;
     const file = req.file as Express.Multer.File;
 
     if (!id) {
@@ -112,7 +133,12 @@ export const updateBarber = async (req: Request, res: Response, next: NextFuncti
 
     const updatedBarber = await prisma.barber.update({
       where: { id },
-      data: { name, email, phone, imageUrl: secure_url },
+      data: {
+        name,
+        email,
+        phone,
+        imageUrl: secure_url,
+      },
     });
     res.status(200).json(updatedBarber);
   } catch (error) {

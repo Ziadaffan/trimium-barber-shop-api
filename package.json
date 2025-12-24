@@ -8,6 +8,7 @@
     "build": "rimraf dist && tsc && tsc-alias -p tsconfig.json -f --outDir dist",
     "start": "node dist/app.js",
     "dev": "dotenv -e .env.local -- ts-node-dev --respawn --transpile-only src/app.ts",
+    "commit": "cz",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "container:up": "docker compose up -d",
@@ -60,6 +61,8 @@
     "@types/morgan": "^1.9.9",
     "@types/multer": "^2.0.0",
     "@types/node": "^20.10.5",
+    "commitizen": "^4.3.1",
+    "cz-conventional-changelog": "^3.3.0",
     "dotenv": "^16.3.1",
     "dotenv-cli": "^8.0.0",
     "prettier": "^3.6.2",
@@ -67,5 +70,10 @@
     "ts-node-dev": "^2.0.0",
     "tsc-alias": "^1.8.10",
     "typescript": "^5.3.3"
+  },
+  "config": {
+    "commitizen": {
+      "path": "cz-conventional-changelog"
+    }
   }
 }
