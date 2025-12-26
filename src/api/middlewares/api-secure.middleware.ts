@@ -4,8 +4,8 @@ import crypto from 'crypto';
 
 export const apiSecureMiddleware = (req: Request, res: Response, next: NextFunction) => {
   try {
-    const timestamp = req.headers['x-timestamp'];
-    const signature = req.headers['x-signature'];
+    const timestamp = req.get('x-timestamp');
+    const signature = req.get('x-signature');
 
     if (!timestamp || !signature) {
       throwError('Missing required headers', 401);
@@ -27,18 +27,9 @@ export const apiSecureMiddleware = (req: Request, res: Response, next: NextFunct
 
     const method = req.method;
     const url = req.originalUrl || req.url;
-    let body = '';
-    if (req.body !== undefined && req.body !== null) {
-      if (typeof req.body === 'string') {
-        body = req.body;
-      } else {
-        body = JSON.stringify(req.body);
-      }
-    }
 
-    const payload = `${method.toUpperCase()}\n${url}\n${body}\n${timestamp}`;
+    const payload = `${method.toUpperCase()}\n${url}\n${timestamp}`;
     const calculatedSignature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
-    console.log('calculated signature', calculatedSignature);
     if (calculatedSignature !== signature) {
       throwError('Invalid signature', 401);
       return;
