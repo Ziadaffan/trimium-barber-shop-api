@@ -18,7 +18,7 @@ router.use('/services', apiSecureMiddleware, serviceRoutes);
 router.use('/schedules', apiSecureMiddleware, scheduleRoutes);
 router.use('/timeoffs', apiSecureMiddleware, timeoffRoutes);
 router.use('/products', apiSecureMiddleware, productRoutes);
-router.use('/google', apiSecureMiddleware, googleRoutes);
+router.use('/google', googleRoutes);
 router.use('/comments', apiSecureMiddleware, commentRoutes);
 router.use('/gallery', apiSecureMiddleware, galleryRoutes);
 router.use('/signature', signatureRoutes);
