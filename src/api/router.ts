@@ -8,17 +8,19 @@ import productRoutes from './routes/product.routes';
 import { googleRoutes } from './routes/google.routes';
 import { commentRoutes } from './routes/comment.routes';
 import { galleryRoutes } from './routes/gallery.routes';
-
+import { apiSecureMiddleware } from './middlewares/api-secure.middleware';
+import signatureRoutes from './routes/signature.routes';
 const router = Router();
 
-router.use('/reservations', reservationRoutes);
-router.use('/barbers', barberRoutes);
-router.use('/services', serviceRoutes);
-router.use('/schedules', scheduleRoutes);
-router.use('/timeoffs', timeoffRoutes);
-router.use('/products', productRoutes);
-router.use('/google', googleRoutes);
-router.use('/comments', commentRoutes);
-router.use('/gallery', galleryRoutes);
+router.use('/reservations', apiSecureMiddleware, reservationRoutes);
+router.use('/barbers', apiSecureMiddleware, barberRoutes);
+router.use('/services', apiSecureMiddleware, serviceRoutes);
+router.use('/schedules', apiSecureMiddleware, scheduleRoutes);
+router.use('/timeoffs', apiSecureMiddleware, timeoffRoutes);
+router.use('/products', apiSecureMiddleware, productRoutes);
+router.use('/google', apiSecureMiddleware, googleRoutes);
+router.use('/comments', apiSecureMiddleware, commentRoutes);
+router.use('/gallery', apiSecureMiddleware, galleryRoutes);
+router.use('/signature', signatureRoutes);
 
 export default router;

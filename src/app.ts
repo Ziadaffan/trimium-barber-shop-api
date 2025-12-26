@@ -27,7 +27,7 @@ const corsOptions: CorsOptions = {
     return callback(new Error(`CORS blocked for origin: ${origin}`));
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-KEY', 'Api-Key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-KEY', 'Api-Key', 'X-Signature', 'X-Timestamp'],
 };
 
 app.use(helmet());
