@@ -94,7 +94,6 @@ export const updateProduct = async (req: Request, res: Response, next: NextFunct
     if (file) {
       if (product.cloudinaryId) {
         const imageUrl = await getImageFromCloudinary(product.cloudinaryId);
-        console.log(imageUrl);
         const { secure_url } = await updateImageInCloudinary(product.cloudinaryId, file.buffer, file.mimetype);
         updateData.image = secure_url;
       }
