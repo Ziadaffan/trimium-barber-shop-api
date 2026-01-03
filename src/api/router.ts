@@ -10,6 +10,7 @@ import { commentRoutes } from './routes/comment.routes';
 import { galleryRoutes } from './routes/gallery.routes';
 import { apiSecureMiddleware } from './middlewares/api-secure.middleware';
 import signatureRoutes from './routes/signature.routes';
+import { authRoutes } from './routes/auth.routes';
 const router = Router();
 
 router.use('/reservations', apiSecureMiddleware, reservationRoutes);
@@ -22,5 +23,6 @@ router.use('/google', googleRoutes);
 router.use('/comments', apiSecureMiddleware, commentRoutes);
 router.use('/gallery', apiSecureMiddleware, galleryRoutes);
 router.use('/signature', signatureRoutes);
+router.use('/auth', authRoutes);
 
 export default router;
