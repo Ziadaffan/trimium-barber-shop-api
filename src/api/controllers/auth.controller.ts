@@ -8,7 +8,12 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     const loginEmail = process.env.LOGIN_EMAIL;
     const loginPassword = process.env.LOGIN_PASSWORD;
 
-    if (email !== loginEmail || password !== loginPassword) {
+    const normalizedEmail = email.toLowerCase();
+    const normalizedPassword = password.toLowerCase();
+    const normalizedLoginEmail = loginEmail?.toLowerCase();
+    const normalizedLoginPassword = loginPassword?.toLowerCase();
+
+    if (normalizedEmail !== normalizedLoginEmail || normalizedPassword !== normalizedLoginPassword) {
       throwError('Invalid email or password', 401);
       return;
     }
@@ -18,7 +23,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       return;
     }
 
-    const token = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '1d' });
+    const token = jwt.sign({ email: normalizedEmail }, process.env.JWT_SECRET, { expiresIn: '1d' });
 
     res.status(200).json({ token });
   } catch (error) {
