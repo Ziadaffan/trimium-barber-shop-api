@@ -315,33 +315,25 @@ export const createReservation = async (req: Request, res: Response, next: NextF
       return;
     }
 
-    try {
-      await addReservationToGoogleCalendar({
-        barberId,
-        clientName,
-        clientPhone,
-        clientEmail,
-        service: service,
-        date: utcStart,
-      });
-    } catch (err) {
-      logger.error(err as any);
-    }
+    await addReservationToGoogleCalendar({
+      barberId,
+      clientName,
+      clientPhone,
+      clientEmail,
+      service: service,
+      date: utcStart,
+    });
 
-    try {
-      await sendReservationConfirmationEmail({
-        reservationId: reservation.id,
-        clientName,
-        clientEmail,
-        clientPhone,
-        barberName: barber.name,
-        serviceName: service.nameEn,
-        startAtUtc: reservation.date,
-        endAtUtc: reservation.endDate,
-      });
-    } catch (err) {
-      logger.error(err as any);
-    }
+    await sendReservationConfirmationEmail({
+      reservationId: reservation.id,
+      clientName,
+      clientEmail,
+      clientPhone,
+      barberName: barber.name,
+      serviceName: service.nameEn,
+      startAtUtc: reservation.date,
+      endAtUtc: reservation.endDate,
+    });
 
     res.status(201).json(reservation);
   } catch (error) {

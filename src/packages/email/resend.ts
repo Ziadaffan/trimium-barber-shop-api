@@ -28,6 +28,10 @@ export async function sendReservationConfirmationEmail(
 ): Promise<SendReservationConfirmationResult> {
   const { enabled, apiKey, from, replyTo, bcc } = getResendConfig();
 
+  if (!input.clientEmail) {
+    return { ok: false, skipped: true, reason: 'CLIENT_EMAIL is not set' };
+  }
+
   if (!enabled) {
     return { ok: false, skipped: true, reason: 'RESEND_ENABLED=false' };
   }

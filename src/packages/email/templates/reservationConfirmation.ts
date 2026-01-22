@@ -8,8 +8,8 @@ export interface ReservationConfirmationEmailInput {
   clientName: string;
   clientEmail: string;
   clientPhone?: string;
-  barberName: string;
-  serviceName: string;
+  barberName?: string;
+  serviceName?: string;
   startAtUtc: Date;
   endAtUtc: Date;
 }
@@ -85,7 +85,7 @@ export function renderReservationConfirmationHtml(input: ReservationConfirmation
                     </td>
                   </tr>
                 </table>
-                <div style="font-size:13px;opacity:0.85;margin-top:4px;">${safe(input.serviceName)} • ${safe(day)} ${safe(
+                <div style="font-size:13px;opacity:0.85;margin-top:4px;">${safe(input.serviceName || '')} • ${safe(day)} ${safe(
                   startTime
                 )}</div>
               </td>
@@ -99,13 +99,13 @@ export function renderReservationConfirmationHtml(input: ReservationConfirmation
                   <tr>
                     <td style="padding:10px 0;border-bottom:1px solid #eef2f6;">
                       <span style="color:#64748b;font-size:12px;">Service</span><br />
-                      <span style="font-size:14px;font-weight:600;">${safe(input.serviceName)}</span>
+                      <span style="font-size:14px;font-weight:600;">${safe(input.serviceName || '')}</span>
                     </td>
                   </tr>
                   <tr>
                     <td style="padding:10px 0;border-bottom:1px solid #eef2f6;">
                       <span style="color:#64748b;font-size:12px;">Barbier</span><br />
-                      <span style="font-size:14px;font-weight:600;">${safe(input.barberName)}</span>
+                      <span style="font-size:14px;font-weight:600;">${safe(input.barberName || '')}</span>
                     </td>
                   </tr>
                   <tr>
