@@ -47,12 +47,13 @@ model Barber {
 }
 
 model Reservation {
-    id       String            @id @default(uuid())
-    barberId String
-    barber   Barber            @relation(fields: [barberId], references: [id], onDelete: Cascade)
-    date     DateTime
-    endDate  DateTime
-    status   ReservationStatus @default(PENDING)
+    id            String            @id @default(uuid())
+    barberId      String
+    barber        Barber            @relation(fields: [barberId], references: [id], onDelete: Cascade)
+    date          DateTime
+    endDate       DateTime
+    status        ReservationStatus @default(PENDING)
+    googleEventId String?           @unique
 
     clientName  String
     clientPhone String

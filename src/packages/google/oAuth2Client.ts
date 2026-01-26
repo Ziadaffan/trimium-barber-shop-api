@@ -225,3 +225,140 @@ export const addReservationToGoogleCalendar = async ({
     return;
   }
 };
+
+// Simple webhook functions
+export const setupCalendarWatch = async (calendarId: string, webhookUrl: string) => {
+  try {
+    await ensureAuthorized();
+
+    const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
+
+    // First, verify the calendar exists by trying to get it
+    try {
+      await calendar.calendars.get({ calendarId });
+    } catch (verifyError: any) {
+      if (verifyError.code === 404) {
+        throwError(
+          `Calendar not found: "${calendarId}". Use "primary" for your main calendar, or get available calendars from /api/google/calendars`,
+          404
+        );
+        return null;
+      }
+      throw verifyError;
+    }
+
+    const safeCalendarId = calendarId.replace(/[^A-Za-z0-9\-_+/=]/g, '_');
+    const timestamp = Date.now().toString();
+    const randomSuffix = Math.random().toString(36).substring(2, 8); // Random string for uniqueness
+    const channelId = `cal_${safeCalendarId}_${timestamp}_${randomSuffix}`;
+
+    const response = await calendar.events.watch({
+      calendarId,
+      requestBody: {
+        id: channelId,
+        type: 'web_hook',
+        address: webhookUrl,
+      },
+    });
+
+    if (response.data.id && response.data.resourceId && response.data.expiration) {
+      return {
+        channelId: response.data.id,
+        resourceId: response.data.resourceId,
+        expiration: response.data.expiration,
+        calendarId,
+      };
+    }
+
+    throwError('Failed to set up calendar watch', 400);
+    return null;
+  } catch (error: any) {
+    if (error.message && error.message.includes('Calendar not found')) {
+      throw error;
+    }
+    throwError(`Failed to set up calendar watch: ${error.message || 'Unknown error'}`, 400);
+    return null;
+  }
+};
+
+export const getCalendarEvent = async (calendarId: string, eventId: string) => {
+  try {
+    await ensureAuthorized();
+
+    const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
+
+    const response = await calendar.events.get({
+      calendarId,
+      eventId,
+    });
+
+    return response.data;
+  } catch (error: any) {
+    throwError(`Failed to get calendar event: ${error.message || 'Unknown error'}`, 400);
+    return null;
+  }
+};
+
+export const listRecentCalendarEvents = async (
+  calendarId: string,
+  maxResults: number = 10,
+  options?: { updatedMin?: string; timeMin?: string; timeMax?: string }
+) => {
+  try {
+    await ensureAuthorized();
+
+    const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
+
+    const requestParams: any = {
+      calendarId,
+      maxResults,
+      singleEvents: true,
+      orderBy: options?.updatedMin ? 'updated' : 'startTime',
+    };
+
+    // Use updatedMin if provided (for webhook processing)
+    if (options?.updatedMin) {
+      requestParams.updatedMin = options.updatedMin;
+    }
+
+    // Use timeMin/timeMax if provided (for date range queries)
+    if (options?.timeMin) {
+      requestParams.timeMin = options.timeMin;
+    } else if (!options?.updatedMin) {
+      // Default to current time if no updatedMin and no timeMin
+      requestParams.timeMin = new Date().toISOString();
+    }
+
+    if (options?.timeMax) {
+      requestParams.timeMax = options.timeMax;
+    } else if (!options?.updatedMin) {
+      // Default to 30 days ahead if no updatedMin and no timeMax
+      const timeMax = new Date();
+      timeMax.setDate(timeMax.getDate() + 30);
+      requestParams.timeMax = timeMax.toISOString();
+    }
+
+    const response = await calendar.events.list(requestParams);
+
+    return response.data.items || [];
+  } catch (error: any) {
+    throwError(`Failed to list calendar events: ${error.message || 'Unknown error'}`, 400);
+    return null;
+  }
+};
+
+// List all available calendars for the authenticated user
+export const listCalendars = async () => {
+  try {
+    await ensureAuthorized();
+
+    const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
+
+    const response = await calendar.calendarList.list();
+
+    return response.data.items || [];
+  } catch (error: any) {
+    throwError(`Failed to list calendars: ${error.message || 'Unknown error'}`, 400);
+    return null;
+  }
+};

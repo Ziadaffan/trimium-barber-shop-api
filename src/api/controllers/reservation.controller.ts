@@ -315,7 +315,8 @@ export const createReservation = async (req: Request, res: Response, next: NextF
       return;
     }
 
-    await addReservationToGoogleCalendar({
+    // Add to Google Calendar and store the event ID
+    const googleEvent = await addReservationToGoogleCalendar({
       barberId,
       clientName,
       clientPhone,
@@ -323,6 +324,14 @@ export const createReservation = async (req: Request, res: Response, next: NextF
       service: service,
       date: utcStart,
     });
+
+    // Update reservation with Google Event ID if available
+    if (googleEvent?.id) {
+      await prisma.reservation.update({
+        where: { id: reservation.id },
+        data: { googleEventId: googleEvent.id },
+      });
+    }
 
     await sendReservationConfirmationEmail({
       reservationId: reservation.id,
