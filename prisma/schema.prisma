@@ -29,12 +29,12 @@ enum BarberTimeOffType {
 }
 
 model Barber {
-    id           String  @id @default(uuid())
-    name         String
-    email        String  @unique
-    phone        String
-    imageUrl     String?
-    cloudinaryId String?
+    id               String  @id @default(uuid())
+    name             String
+    email            String  @unique
+    phone            String
+    imageUrl         String?
+    cloudinaryId     String?
     googleCalendarId String? @unique
 
     Reservation Reservation[]
@@ -69,17 +69,17 @@ model Reservation {
 }
 
 model Service {
-    id           String        @id @default(uuid())
-    type         String
-    nameEn       String
-    nameFr       String
+    id            String        @id @default(uuid())
+    type          String
+    nameEn        String
+    nameFr        String
     descriptionEn String?
     descriptionFr String?
-    price        Float         @default(0)
-    duration     Int           @default(60) // In minutes
-    isPremium    Boolean       @default(false)
-    isActive     Boolean       @default(true)
-    reservations Reservation[]
+    price         Float         @default(0)
+    duration      Int           @default(60) // In minutes
+    isPremium     Boolean       @default(false)
+    isActive      Boolean       @default(true)
+    reservations  Reservation[]
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
@@ -170,4 +170,15 @@ model Gallery {
     position     Int
     createdAt    DateTime @default(now())
     updatedAt    DateTime @updatedAt
+}
+
+model GoogleCalendarWatch {
+    id         String   @id @default(uuid())
+    calendarId String   @unique
+    channelId  String
+    resourceId String
+    expiration BigInt
+    webhookUrl String
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
 }

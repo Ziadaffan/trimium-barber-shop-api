@@ -6,6 +6,8 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { errorHandlerMiddleware } from './api/middlewares/error.handler.middleware';
 import { logger } from './packages/common/logger';
+import cron from 'node-cron';
+import { renewExpiredWatches } from './api/controllers/google.controller';
 
 dotenv.config();
 
@@ -67,6 +69,14 @@ app.use('*', (req: Request, res: Response) => {
 });
 
 app.use(errorHandlerMiddleware);
+
+cron.schedule('50 11 * * *', async () => {
+  await renewExpiredWatches();
+},
+  {
+    timezone: 'America/Montreal',
+  }
+)
 
 if (require.main === module) {
   app.listen(PORT, () => {

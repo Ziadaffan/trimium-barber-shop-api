@@ -14,6 +14,9 @@ import prisma from '../../packages/lib/db';
 import { ReservationStatus } from '@prisma/client';
 import { logger } from '../../packages/common/logger';
 
+const recentWebhooks = new Map<string, number>();
+const WEBHOOK_COOLDOWN = 5000;
+
 export const getGoogleAuthUrl = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authUrl = getAuthUrl();
@@ -103,18 +106,15 @@ export const checkGoogleAuthStatus = async (req: Request, res: Response, next: N
   }
 };
 
-// Webhook handler - receives notifications from Google Calendar
 export const handleCalendarWebhook = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const resourceState = req.headers['x-goog-resource-state'];
 
-    // 1. Quick exit for sync notifications
     if (resourceState === 'sync') {
       logger.info('Google Calendar webhook sync notification received');
       return res.status(200).send('OK');
     }
 
-    // 2. Extract Calendar ID
     const resourceUri = req.headers['x-goog-resource-uri'] as string;
     const match = resourceUri?.match(/calendars\/([^\/]+)/);
     const calendarId = match ? decodeURIComponent(match[1]) : (req.query.calendarId as string);
@@ -124,7 +124,22 @@ export const handleCalendarWebhook = async (req: Request, res: Response, next: N
       return res.status(200).send('OK');
     }
 
-    // 3. Find the Barber
+    const lastProcessed = recentWebhooks.get(calendarId);
+    const now = Date.now();
+
+    if (lastProcessed && (now - lastProcessed) < WEBHOOK_COOLDOWN) {
+      logger.info(`Ignoring duplicate webhook for ${calendarId} (cooldown: ${WEBHOOK_COOLDOWN}ms)`);
+      return res.status(200).send('OK');
+    }
+
+    recentWebhooks.set(calendarId, now);
+
+    for (const [key, timestamp] of recentWebhooks.entries()) {
+      if (now - timestamp > 60000) {
+        recentWebhooks.delete(key);
+      }
+    }
+
     const barber = await prisma.barber.findUnique({
       where: { googleCalendarId: calendarId },
     });
@@ -134,23 +149,28 @@ export const handleCalendarWebhook = async (req: Request, res: Response, next: N
       return res.status(200).send('OK');
     }
 
-    // 4. Fetch events updated VERY recently
-    // Use updatedMin to reduce the payload size and handle eventual consistency
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    const events = await listRecentCalendarEvents(calendarId, 20, { updatedMin: fiveMinutesAgo });
+
+    let events;
+    try {
+      events = await listRecentCalendarEvents(calendarId, 20, { updatedMin: fiveMinutesAgo });
+    } catch (error: any) {
+      if (error.message?.includes('Quota exceeded')) {
+        logger.warn(`Quota exceeded for calendar ${calendarId}, will retry later`);
+        return res.status(200).send('OK');
+      }
+      throw error;
+    }
 
     if (!events || events.length === 0) {
       logger.info('No events updated in the last 5 minutes');
       return res.status(200).send('OK');
     }
 
-    // Process events (Google sometimes batches these)
-    // Track processed event IDs to avoid duplicates in the same batch
     const processedEventIds = new Set<string>();
 
     for (const event of events) {
       if (event.status === 'cancelled') {
-        // Handle deletion if necessary
         logger.info(`Event ${event.id} was cancelled`);
         continue;
       }
@@ -160,18 +180,15 @@ export const handleCalendarWebhook = async (req: Request, res: Response, next: N
         continue;
       }
 
-      // Skip if we've already processed this event ID in this batch
       if (processedEventIds.has(event.id)) {
         logger.info(`Skipping duplicate event ${event.id} in same batch`);
         continue;
       }
 
-      // 5. Check by Google Event ID (The Golden Standard)
       const existing = await prisma.reservation.findFirst({
         where: {
           OR: [
             { googleEventId: event.id },
-            // Fallback for old records without IDs - check unique constraint
             {
               barberId: barber.id,
               date: new Date(event.start.dateTime)
@@ -185,7 +202,6 @@ export const handleCalendarWebhook = async (req: Request, res: Response, next: N
         await createReservationFromEvent(event, barber.id);
         processedEventIds.add(event.id);
       } else if (existing && !existing.googleEventId) {
-        // Link the ID if it was missing
         logger.info(`Linking googleEventId ${event.id} to existing reservation ${existing.id}`);
         await prisma.reservation.update({
           where: { id: existing.id },
@@ -201,12 +217,10 @@ export const handleCalendarWebhook = async (req: Request, res: Response, next: N
     res.status(200).send('OK');
   } catch (error: any) {
     logger.error(`Webhook Error: ${error.message}`);
-    // Always return 200 to prevent Google from retrying
     res.status(200).send('OK');
   }
 };
 
-// Create reservation from Google Calendar event
 const createReservationFromEvent = async (event: any, barberId: string) => {
   try {
     if (!event.start?.dateTime || !event.end?.dateTime) {
@@ -222,8 +236,6 @@ const createReservationFromEvent = async (event: any, barberId: string) => {
     const startDate = new Date(event.start.dateTime);
     const endDate = new Date(event.end.dateTime);
 
-    // Check if reservation already exists by googleEventId OR by unique constraint (date + barberId)
-    // This prevents race conditions when multiple webhooks arrive simultaneously
     const existing = await prisma.reservation.findFirst({
       where: {
         OR: [
@@ -240,7 +252,6 @@ const createReservationFromEvent = async (event: any, barberId: string) => {
       if (existing.googleEventId === event.id) {
         logger.info(`Reservation already exists with googleEventId: ${event.id}`);
       } else {
-        // Reservation exists by date/barberId but doesn't have googleEventId - update it
         logger.info(`Updating existing reservation ${existing.id} with googleEventId: ${event.id}`);
         await prisma.reservation.update({
           where: { id: existing.id },
@@ -250,16 +261,13 @@ const createReservationFromEvent = async (event: any, barberId: string) => {
       return;
     }
 
-    // Extract content from event
     const eventTitle = event.summary || 'New Reservation';
     const eventDescription = event.description || '';
 
-    // Parse client info from title and description
     let clientName = eventTitle.replace(/^Client:\s*/i, '').trim() || 'Unknown Client';
     let clientPhone = '';
     let clientEmail = '';
 
-    // Extract phone and email from description
     if (eventDescription) {
       const phoneMatch = eventDescription.match(/Phone:\s*([^\n]+)/i);
       const emailMatch = eventDescription.match(/Email:\s*([^\n]+)/i);
@@ -268,10 +276,8 @@ const createReservationFromEvent = async (event: any, barberId: string) => {
       if (emailMatch) clientEmail = emailMatch[1].trim();
     }
 
-    // Calculate duration in minutes
     const durationMinutes = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60));
 
-    // Find a matching service by duration (within 5 minutes tolerance)
     const services = await prisma.service.findMany({
       where: { isActive: true },
     });
@@ -282,15 +288,12 @@ const createReservationFromEvent = async (event: any, barberId: string) => {
     if (matchingService) {
       serviceId = matchingService.id;
     } else if (services.length > 0) {
-      // Use first active service as fallback
       serviceId = services[0].id;
     } else {
       logger.warn('No active services found, cannot create reservation');
       return;
     }
 
-    // Create reservation with googleEventId
-    // Use try-catch to handle race conditions when multiple webhooks arrive simultaneously
     logger.info(`Creating reservation from Google Calendar event: ${event.id} for ${clientName}`);
 
     try {
@@ -304,23 +307,19 @@ const createReservationFromEvent = async (event: any, barberId: string) => {
           clientPhone: clientPhone || 'N/A',
           clientEmail: clientEmail || 'N/A',
           serviceId: serviceId!,
-          googleEventId: event.id, // Store the Google Event ID
+          googleEventId: event.id,
         },
       });
 
       logger.info(`✅ Created reservation ${reservation.id} from Google Calendar event: ${event.id}`);
     } catch (error: any) {
-      // Handle duplicate key errors (race condition - another webhook created it first)
       if (error.code === 'P2002') {
-        // Check if it's the date+barberId constraint or googleEventId constraint
         const target = error.meta?.target || [];
 
         if (target.includes('googleEventId')) {
-          // Another reservation already has this googleEventId - skip
           logger.info(`Reservation with googleEventId ${event.id} already exists`);
           return;
         } else if (target.includes('date') || target.includes('barberId')) {
-          // Reservation exists for this date+barberId - update it with googleEventId if missing
           logger.info(`Reservation exists for date+barberId, updating with googleEventId: ${event.id}`);
           const existing = await prisma.reservation.findFirst({
             where: {
@@ -350,12 +349,10 @@ const createReservationFromEvent = async (event: any, barberId: string) => {
       }
     }
   } catch (error: any) {
-    // Outer catch for any other errors
     logger.error(`Error in createReservationFromEvent: ${error.message}`);
   }
 };
 
-// List available calendars
 export const getAvailableCalendars = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const calendars = await listCalendars();
@@ -365,7 +362,6 @@ export const getAvailableCalendars = async (req: Request, res: Response, next: N
       return;
     }
 
-    // Format response with useful information
     const formattedCalendars = calendars.map(cal => ({
       id: cal.id,
       summary: cal.summary,
@@ -383,7 +379,6 @@ export const getAvailableCalendars = async (req: Request, res: Response, next: N
   }
 };
 
-// Setup webhook for a calendar
 export const setupWebhook = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { calendarId } = req.body;
@@ -403,12 +398,82 @@ export const setupWebhook = async (req: Request, res: Response, next: NextFuncti
       return;
     }
 
+    await prisma.googleCalendarWatch.upsert({
+      where: { calendarId },
+      update: {
+        channelId: watch.channelId,
+        resourceId: watch.resourceId,
+        expiration: BigInt(watch.expiration),
+        webhookUrl: webhookUrl,
+      },
+      create: {
+        calendarId,
+        channelId: watch.channelId,
+        resourceId: watch.resourceId,
+        expiration: BigInt(watch.expiration),
+        webhookUrl: webhookUrl,
+      },
+    });
+
     res.status(200).json({
       message: 'Calendar webhook enabled successfully',
-      watch,
-      note: 'Webhook will expire in 7 days. You will need to renew it.',
+      watch: {
+        ...watch,
+        expiration: watch.expiration,
+      },
+      note: 'Webhook will auto-renew before expiration via cron job.',
     });
   } catch (error) {
     next(error);
+  }
+};
+
+export const renewExpiredWatches = async () => {
+  try {
+    logger.info('Starting watch renewal cron job');
+
+    const watches = await prisma.googleCalendarWatch.findMany();
+    const twoDaysFromNow = BigInt(Date.now() + (2 * 24 * 60 * 60 * 1000));
+
+    let renewedCount = 0;
+    let failedCount = 0;
+
+    for (const watch of watches) {
+      try {
+        const expirationTime = BigInt(watch.expiration);
+
+        if (expirationTime < twoDaysFromNow) {
+          logger.info(`Renewing watch for calendar ${watch.calendarId}`);
+
+          const newWatch = await setupCalendarWatch(watch.calendarId, watch.webhookUrl);
+
+          if (newWatch) {
+            await prisma.googleCalendarWatch.update({
+              where: { calendarId: watch.calendarId },
+              data: {
+                channelId: newWatch.channelId,
+                resourceId: newWatch.resourceId,
+                expiration: BigInt(newWatch.expiration),
+              },
+            });
+
+            renewedCount++;
+            logger.info(`✅ Successfully renewed watch for ${watch.calendarId}`);
+          }
+        } else {
+          const daysRemaining = Number(expirationTime - BigInt(Date.now())) / (24 * 60 * 60 * 1000);
+          logger.info(`Watch for ${watch.calendarId} still valid for ${daysRemaining.toFixed(1)} days`);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error: any) {
+        failedCount++;
+        logger.error(`Failed to renew watch for ${watch.calendarId}: ${error.message}`);
+      }
+    }
+
+    logger.info(`Watch renewal completed. Renewed: ${renewedCount}, Failed: ${failedCount}`);
+  } catch (error: any) {
+    logger.error(`Error in renewExpiredWatches cron job: ${error.message}`);
   }
 };
