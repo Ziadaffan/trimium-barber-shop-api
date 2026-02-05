@@ -107,7 +107,7 @@ export const checkGoogleAuthStatus = async (req: Request, res: Response, next: N
 export const handleCalendarWebhook = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const resourceState = req.headers['x-goog-resource-state'];
-    
+
     // 1. Quick exit for sync notifications
     if (resourceState === 'sync') {
       logger.info('Google Calendar webhook sync notification received');
@@ -147,7 +147,7 @@ export const handleCalendarWebhook = async (req: Request, res: Response, next: N
     // Process events (Google sometimes batches these)
     // Track processed event IDs to avoid duplicates in the same batch
     const processedEventIds = new Set<string>();
-    
+
     for (const event of events) {
       if (event.status === 'cancelled') {
         // Handle deletion if necessary
@@ -168,13 +168,13 @@ export const handleCalendarWebhook = async (req: Request, res: Response, next: N
 
       // 5. Check by Google Event ID (The Golden Standard)
       const existing = await prisma.reservation.findFirst({
-        where: { 
+        where: {
           OR: [
             { googleEventId: event.id },
             // Fallback for old records without IDs - check unique constraint
-            { 
+            {
               barberId: barber.id,
-              date: new Date(event.start.dateTime) 
+              date: new Date(event.start.dateTime)
             }
           ]
         },
@@ -314,7 +314,7 @@ const createReservationFromEvent = async (event: any, barberId: string) => {
       if (error.code === 'P2002') {
         // Check if it's the date+barberId constraint or googleEventId constraint
         const target = error.meta?.target || [];
-        
+
         if (target.includes('googleEventId')) {
           // Another reservation already has this googleEventId - skip
           logger.info(`Reservation with googleEventId ${event.id} already exists`);
@@ -328,7 +328,7 @@ const createReservationFromEvent = async (event: any, barberId: string) => {
               date: startDate,
             },
           });
-          
+
           if (existing) {
             if (!existing.googleEventId) {
               await prisma.reservation.update({
@@ -342,7 +342,7 @@ const createReservationFromEvent = async (event: any, barberId: string) => {
           }
           return;
         }
-        
+
         logger.warn(`Reservation already exists (duplicate key): ${error.message}`);
       } else {
         logger.error(`Error creating reservation from event: ${error.message}`);

@@ -13,15 +13,15 @@ import signatureRoutes from './routes/signature.routes';
 import { authRoutes } from './routes/auth.routes';
 const router = Router();
 
-router.use('/reservations', apiSecureMiddleware, reservationRoutes);
-router.use('/barbers', apiSecureMiddleware, barberRoutes);
-router.use('/services', apiSecureMiddleware, serviceRoutes);
-router.use('/schedules', apiSecureMiddleware, scheduleRoutes);
-router.use('/timeoffs', apiSecureMiddleware, timeoffRoutes);
-router.use('/products', apiSecureMiddleware, productRoutes);
+router.use('/reservations', reservationRoutes);
+router.use('/barbers', barberRoutes);
+router.use('/services', serviceRoutes);
+router.use('/schedules', scheduleRoutes);
+router.use('/timeoffs', timeoffRoutes);
+router.use('/products', productRoutes);
 router.use('/google', googleRoutes);
-router.use('/comments', apiSecureMiddleware, commentRoutes);
-router.use('/gallery', apiSecureMiddleware, galleryRoutes);
+router.use('/comments', commentRoutes);
+router.use('/gallery', galleryRoutes);
 router.use('/signature', signatureRoutes);
 router.use('/auth', authRoutes);
 
