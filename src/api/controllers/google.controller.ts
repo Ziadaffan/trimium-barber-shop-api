@@ -111,7 +111,6 @@ export const handleCalendarWebhook = async (req: Request, res: Response, next: N
     const resourceState = req.headers['x-goog-resource-state'];
 
     if (resourceState === 'sync') {
-      logger.info('Google Calendar webhook sync notification received');
       return res.status(200).send('OK');
     }
 
@@ -128,7 +127,6 @@ export const handleCalendarWebhook = async (req: Request, res: Response, next: N
     const now = Date.now();
 
     if (lastProcessed && (now - lastProcessed) < WEBHOOK_COOLDOWN) {
-      logger.info(`Ignoring duplicate webhook for ${calendarId} (cooldown: ${WEBHOOK_COOLDOWN}ms)`);
       return res.status(200).send('OK');
     }
 
@@ -163,7 +161,6 @@ export const handleCalendarWebhook = async (req: Request, res: Response, next: N
     }
 
     if (!events || events.length === 0) {
-      logger.info('No events updated in the last 5 minutes');
       return res.status(200).send('OK');
     }
 
@@ -171,17 +168,14 @@ export const handleCalendarWebhook = async (req: Request, res: Response, next: N
 
     for (const event of events) {
       if (event.status === 'cancelled') {
-        logger.info(`Event ${event.id} was cancelled`);
         continue;
       }
 
       if (!event.id || !event.start?.dateTime) {
-        logger.warn(`Event missing required fields: id=${event.id}, start=${event.start?.dateTime}`);
         continue;
       }
 
       if (processedEventIds.has(event.id)) {
-        logger.info(`Skipping duplicate event ${event.id} in same batch`);
         continue;
       }
 
@@ -198,18 +192,15 @@ export const handleCalendarWebhook = async (req: Request, res: Response, next: N
       });
 
       if (!existing) {
-        logger.info(`Processing new event: ${event.id} - "${event.summary || 'Untitled'}"`);
         await createReservationFromEvent(event, barber.id);
         processedEventIds.add(event.id);
       } else if (existing && !existing.googleEventId) {
-        logger.info(`Linking googleEventId ${event.id} to existing reservation ${existing.id}`);
         await prisma.reservation.update({
           where: { id: existing.id },
           data: { googleEventId: event.id }
         });
         processedEventIds.add(event.id);
       } else {
-        logger.info(`Skipping event ${event.id} - reservation already exists with googleEventId`);
         processedEventIds.add(event.id);
       }
     }
@@ -250,9 +241,7 @@ const createReservationFromEvent = async (event: any, barberId: string) => {
 
     if (existing) {
       if (existing.googleEventId === event.id) {
-        logger.info(`Reservation already exists with googleEventId: ${event.id}`);
       } else {
-        logger.info(`Updating existing reservation ${existing.id} with googleEventId: ${event.id}`);
         await prisma.reservation.update({
           where: { id: existing.id },
           data: { googleEventId: event.id },
@@ -294,8 +283,6 @@ const createReservationFromEvent = async (event: any, barberId: string) => {
       return;
     }
 
-    logger.info(`Creating reservation from Google Calendar event: ${event.id} for ${clientName}`);
-
     try {
       const reservation = await prisma.reservation.create({
         data: {
@@ -317,10 +304,8 @@ const createReservationFromEvent = async (event: any, barberId: string) => {
         const target = error.meta?.target || [];
 
         if (target.includes('googleEventId')) {
-          logger.info(`Reservation with googleEventId ${event.id} already exists`);
           return;
         } else if (target.includes('date') || target.includes('barberId')) {
-          logger.info(`Reservation exists for date+barberId, updating with googleEventId: ${event.id}`);
           const existing = await prisma.reservation.findFirst({
             where: {
               barberId,
@@ -334,15 +319,11 @@ const createReservationFromEvent = async (event: any, barberId: string) => {
                 where: { id: existing.id },
                 data: { googleEventId: event.id },
               });
-              logger.info(`✅ Updated reservation ${existing.id} with googleEventId: ${event.id}`);
-            } else if (existing.googleEventId === event.id) {
-              logger.info(`Reservation ${existing.id} already has googleEventId: ${event.id}`);
             }
           }
           return;
         }
 
-        logger.warn(`Reservation already exists (duplicate key): ${error.message}`);
       } else {
         logger.error(`Error creating reservation from event: ${error.message}`);
         throw error;
@@ -430,8 +411,6 @@ export const setupWebhook = async (req: Request, res: Response, next: NextFuncti
 
 export const renewExpiredWatches = async () => {
   try {
-    logger.info('Starting watch renewal cron job');
-
     const watches = await prisma.googleCalendarWatch.findMany();
     const twoDaysFromNow = BigInt(Date.now() + (2 * 24 * 60 * 60 * 1000));
 
