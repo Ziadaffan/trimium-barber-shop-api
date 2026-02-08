@@ -23,7 +23,7 @@ export const getGoogleAuthUrl = async (req: Request, res: Response, next: NextFu
 
     return res.redirect(authUrl);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
@@ -76,12 +76,12 @@ export const handleGoogleCallback = async (req: Request, res: Response, next: Ne
       },
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       message: '✅ Google Calendar authorized successfully!',
       tokens: tokenInfo,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
@@ -90,19 +90,19 @@ export const checkGoogleAuthStatus = async (req: Request, res: Response, next: N
     const tokens = await getStoredTokens();
 
     if (tokens) {
-      res.status(200).json({
+      return res.status(200).json({
         authorized: true,
         message: 'Google Calendar is authorized',
       });
     } else {
-      res.status(200).json({
+      return res.status(200).json({
         authorized: false,
         message: 'Google Calendar is not authorized',
         authUrl: getAuthUrl(),
       });
     }
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
@@ -205,10 +205,10 @@ export const handleCalendarWebhook = async (req: Request, res: Response, next: N
       }
     }
 
-    res.status(200).send('OK');
+    return res.status(200).send('OK');
   } catch (error: any) {
     logger.error(`Webhook Error: ${error.message}`);
-    res.status(200).send('OK');
+    return res.status(200).send('OK');
   }
 };
 
@@ -351,12 +351,12 @@ export const getAvailableCalendars = async (req: Request, res: Response, next: N
       accessRole: cal.accessRole,
     }));
 
-    res.status(200).json({
+    return res.status(200).json({
       calendars: formattedCalendars,
       message: `Found ${formattedCalendars.length} calendar(s). Use "primary" for your main calendar, or any calendar ID from the list above.`,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
@@ -396,7 +396,7 @@ export const setupWebhook = async (req: Request, res: Response, next: NextFuncti
       },
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       message: 'Calendar webhook enabled successfully',
       watch: {
         ...watch,
@@ -405,7 +405,7 @@ export const setupWebhook = async (req: Request, res: Response, next: NextFuncti
       note: 'Webhook will auto-renew before expiration via cron job.',
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 

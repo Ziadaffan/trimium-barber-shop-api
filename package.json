@@ -70,6 +70,7 @@
     "@types/multer": "^2.0.0",
     "@types/node": "^20.10.5",
     "@types/node-schedule": "^2.1.8",
+    "@vercel/node": "^5.5.33",
     "commitizen": "^4.3.1",
     "cz-conventional-changelog": "^3.3.0",
     "dotenv": "^16.3.1",
