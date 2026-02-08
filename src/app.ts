@@ -70,13 +70,17 @@ app.use('*', (req: Request, res: Response) => {
 
 app.use(errorHandlerMiddleware);
 
-cron.schedule('50 11 * * *', async () => {
-  await renewExpiredWatches();
-},
-  {
-    timezone: 'America/Montreal',
+cron.schedule('0 2 * * *', async () => {
+  try {
+    logger.info('Starting scheduled renewExpiredWatches task');
+    await renewExpiredWatches();
+    logger.info('Successfully completed renewExpiredWatches task');
+  } catch (error) {
+    logger.error('Failed to renew expired watches:', error);
   }
-)
+}, {
+  timezone: 'America/Montreal',
+});
 
 if (require.main === module) {
   app.listen(PORT, () => {
