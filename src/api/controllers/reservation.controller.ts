@@ -13,6 +13,7 @@ import {
   parseTimeToMinutes,
 } from '../../packages/common/utils/reservation-time.utils';
 import { isValidReservationStatus, parseReservationStartEnd } from '../../packages/common/utils/reservation.utils';
+import { hiddenTestBarberFilter } from '../../packages/common/utils/test-barber.utils';
 
 export const getAvailableTimes = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -173,6 +174,7 @@ export const getAvailableTimes = async (req: Request, res: Response, next: NextF
 export const getReservations = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const reservations = await prisma.reservation.findMany({
+      where: { barber: hiddenTestBarberFilter() },
       include: {
         barber: true,
         service: true,
@@ -189,7 +191,10 @@ export const getReservations = async (req: Request, res: Response, next: NextFun
 
 export const createReservation = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { barberId, date, time, endDate, clientName, clientPhone, clientEmail, serviceId, status } = req.body;
+    const { barberId, date, time, endDate, clientName, clientPhone, clientEmail, serviceId, status, language } =
+      req.body;
+
+    const emailLanguage: 'en' | 'fr' = language === 'en' ? 'en' : 'fr';
 
     if (!barberId || !date || !clientName || !clientPhone || !clientEmail || !serviceId) {
       throwError('All fields are required', 400);
@@ -339,9 +344,10 @@ export const createReservation = async (req: Request, res: Response, next: NextF
       clientEmail,
       clientPhone,
       barberName: barber.name,
-      serviceName: service.nameEn,
+      serviceName: emailLanguage === 'fr' ? service.nameFr : service.nameEn,
       startAtUtc: reservation.date,
       endAtUtc: reservation.endDate,
+      language: emailLanguage,
     });
 
     res.status(201).json(reservation);
