@@ -19,6 +19,7 @@ import {
   wallClockMinutesFrom,
 } from '../../packages/common/utils/availability.utils';
 import { isValidReservationStatus, parseReservationStartEnd } from '../../packages/common/utils/reservation.utils';
+import { hiddenTestBarberFilter } from '../../packages/common/utils/test-barber.utils';
 import { type Locale, resolveLocale } from '../../packages/common/i18n/locale';
 import { getReservationStrings } from '../../packages/common/i18n/reservation.strings';
 import {
@@ -175,6 +176,7 @@ export const getAvailableTimes = async (req: Request, res: Response, next: NextF
 export const getReservations = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const reservations = await prisma.reservation.findMany({
+      where: { barber: hiddenTestBarberFilter() },
       include: {
         barber: true,
         service: true,
@@ -206,7 +208,8 @@ const findOverlappingReservation = (barberId: string, utcStart: Date, utcEnd: Da
 
 export const createReservation = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { barberId, date, time, endDate, clientName, clientPhone, clientEmail, serviceId, status } = req.body;
+    const { barberId, date, time, endDate, clientName, clientPhone, clientEmail, serviceId, status, language } =
+      req.body;
 
     if (!barberId || !date || !clientName || !clientPhone || !clientEmail || !serviceId) {
       throwError('All fields are required', 400);
@@ -328,7 +331,9 @@ export const createReservation = async (req: Request, res: Response, next: NextF
       });
     }
 
-    const locale = resolveLocale(req.body?.locale, req.query?.locale, req.get('accept-language'));
+    // `language` is what the booking form sends; `locale` is accepted too, then the query
+    // string and finally the Accept-Language header. Falls back to French.
+    const locale = resolveLocale(req.body?.locale, language, req.query?.locale, req.get('accept-language'));
 
     await sendReservationConfirmationEmail({
       requestOrigin: getRequestOrigin(req),

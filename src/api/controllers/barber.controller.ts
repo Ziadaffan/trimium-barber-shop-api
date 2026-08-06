@@ -5,13 +5,16 @@ import {
   uploadToCloudinary,
 } from '../../packages/cloudinary/cloudinaryClient';
 import { throwError } from '../../packages/common/utils/error.handler.utils';
+import { hiddenTestBarberFilter } from '../../packages/common/utils/test-barber.utils';
 import prisma from '../../packages/lib/db';
 import { NextFunction, Request, Response } from 'express';
 import { createBarberCalendar, deleteCalendarById } from '../../packages/google/oAuth2Client';
 
 export const getBarbers = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const barbers = await prisma.barber.findMany();
+    const barbers = await prisma.barber.findMany({
+      where: hiddenTestBarberFilter(),
+    });
 
     res.status(200).json(barbers);
   } catch (error) {
