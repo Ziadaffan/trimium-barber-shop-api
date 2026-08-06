@@ -65,7 +65,10 @@ model Reservation {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
-    @@unique([date, barberId])
+    // Slot uniqueness is enforced by the partial index "Reservation_date_barberId_active_key"
+    // (see migration 20260804210000_partial_unique_active_reservation_slot). It excludes
+    // CANCELLED rows so a cancelled slot can be booked again; Prisma cannot declare partial
+    // indexes, so do not re-add @@unique([date, barberId]) here.
 }
 
 model Service {

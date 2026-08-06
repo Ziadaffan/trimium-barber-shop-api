@@ -47,5 +47,3 @@ export const parseReservationStartEnd = (input: {
 
   return { utcStart, utcEnd };
 };
-
-

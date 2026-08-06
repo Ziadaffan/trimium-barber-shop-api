@@ -8,6 +8,7 @@ import {
   getCalendarEvent,
   listRecentCalendarEvents,
   listCalendars,
+  verifyOAuthState,
 } from '../../packages/google/oAuth2Client';
 import { throwError } from '../../packages/common/utils/error.handler.utils';
 import prisma from '../../packages/lib/db';
@@ -19,9 +20,9 @@ const WEBHOOK_COOLDOWN = 5000;
 
 export const getGoogleAuthUrl = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const authUrl = getAuthUrl();
-
-    return res.redirect(authUrl);
+    // Returns the URL instead of redirecting: this route requires admin credentials, which a
+    // plain browser redirect cannot carry. The admin app redirects the user to authUrl itself.
+    return res.status(200).json({ authUrl: getAuthUrl() });
   } catch (error) {
     return next(error);
   }
@@ -29,10 +30,17 @@ export const getGoogleAuthUrl = async (req: Request, res: Response, next: NextFu
 
 export const handleGoogleCallback = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { code } = req.query;
+    const { code, state } = req.query;
 
     if (!code || typeof code !== 'string') {
       throwError('Authorization code is required', 400);
+      return;
+    }
+
+    // Google redirects a browser here, so there are no credentials on the request. The signed
+    // state proves the flow was started by an authenticated admin through /api/google/auth.
+    if (!verifyOAuthState(state)) {
+      throwError('Invalid or expired OAuth state. Restart the flow from /api/google/auth', 403);
       return;
     }
 
@@ -44,12 +52,6 @@ export const handleGoogleCallback = async (req: Request, res: Response, next: Ne
     }
 
     setCredentials(tokens);
-
-    const tokenInfo = {
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      expiry_date: tokens.expiry_date,
-    };
 
     if (!tokens.access_token || !tokens.refresh_token || !tokens.expiry_date) {
       throwError('Failed to get tokens from authorization code', 400);
@@ -76,9 +78,12 @@ export const handleGoogleCallback = async (req: Request, res: Response, next: Ne
       },
     });
 
+    // The tokens are deliberately not echoed back: this response lands in a browser, and from
+    // there in history, proxies and logs.
     return res.status(200).json({
       message: '✅ Google Calendar authorized successfully!',
-      tokens: tokenInfo,
+      authorized: true,
+      expiresAt: new Date(tokens.expiry_date).toISOString(),
     });
   } catch (error) {
     return next(error);

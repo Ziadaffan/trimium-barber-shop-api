@@ -1,7 +1,9 @@
 import { google } from 'googleapis';
 import { Service } from '@prisma/client';
 import { throwError } from '../common/utils/error.handler.utils';
+import { getSecretFromEnv, hmacHex, timingSafeEqualString } from '../common/utils/hmac.utils';
 import prisma from '../lib/db';
+import { logger } from '../common/logger';
 
 interface AddReservationToGoogleCalendarProps {
   barberId: string;
@@ -10,9 +12,45 @@ interface AddReservationToGoogleCalendarProps {
   clientEmail: string;
   service: Service;
   date: Date;
+  endDate?: Date;
 }
 
 const SCOPES = ['https://www.googleapis.com/auth/calendar'];
+const CALENDAR_TIMEZONE = 'America/Toronto';
+const OAUTH_STATE_TTL_MS = 15 * 60 * 1000;
+
+const getOAuthStateSecret = () => getSecretFromEnv('API_SECRET', 'JWT_SECRET');
+
+/**
+ * The OAuth callback has to stay publicly reachable for Google to redirect to it, so it is
+ * bound to a short-lived signed state that only our own (authenticated) /auth route can mint.
+ * Without it, anyone could complete the flow with their own Google account and overwrite the
+ * shop's stored calendar tokens.
+ */
+export const createOAuthState = (now: number = Date.now()): string => {
+  const secret = getOAuthStateSecret();
+  if (!secret) {
+    throwError('Server misconfiguration: API_SECRET or JWT_SECRET is required for the Google OAuth flow', 500);
+  }
+
+  const expiresAt = now + OAUTH_STATE_TTL_MS;
+  return `${expiresAt}.${hmacHex(`oauth-state:${expiresAt}`, secret as string)}`;
+};
+
+export const verifyOAuthState = (state: unknown, now: number = Date.now()): boolean => {
+  if (typeof state !== 'string') return false;
+
+  const [expiresAtRaw, signature] = state.split('.');
+  if (!expiresAtRaw || !signature) return false;
+
+  const expiresAt = Number(expiresAtRaw);
+  if (!Number.isFinite(expiresAt) || expiresAt < now) return false;
+
+  const secret = getOAuthStateSecret();
+  if (!secret) return false;
+
+  return timingSafeEqualString(hmacHex(`oauth-state:${expiresAt}`, secret), signature);
+};
 
 export const oAuth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -32,6 +70,7 @@ export const getAuthUrl = (): string => {
     access_type: 'offline',
     prompt: 'consent',
     scope: SCOPES,
+    state: createOAuthState(),
   });
 
   return url;
@@ -163,6 +202,43 @@ export const deleteCalendarById = async (calendarId: string) => {
   }
 };
 
+export interface ReservationEventDetails {
+  clientName: string;
+  clientPhone: string;
+  clientEmail: string;
+  serviceName: string;
+  startAt: Date;
+  endAt: Date;
+}
+
+const buildReservationEvent = ({
+  clientName,
+  clientPhone,
+  clientEmail,
+  serviceName,
+  startAt,
+  endAt,
+}: ReservationEventDetails) => ({
+  summary: `Client: ${clientName}`,
+  description: `Phone: ${clientPhone}\nEmail: ${clientEmail}\nService: ${serviceName}`,
+  start: { dateTime: startAt.toISOString(), timeZone: CALENDAR_TIMEZONE },
+  end: { dateTime: endAt.toISOString(), timeZone: CALENDAR_TIMEZONE },
+});
+
+const describeCalendarError = (error: any): string => {
+  if (error?.code === 401 || error?.message?.includes('invalid_grant')) {
+    return 'Google Calendar authorization expired, re-authorize at /api/google/auth';
+  }
+
+  return error?.message || 'Unknown error';
+};
+
+/**
+ * Creates the barber-side event for a reservation.
+ *
+ * Never throws: the reservation exists in our database either way, and a calendar outage must
+ * not turn a successful booking into a failed request. Returns null when nothing was created.
+ */
 export const addReservationToGoogleCalendar = async ({
   barberId,
   clientName,
@@ -170,6 +246,7 @@ export const addReservationToGoogleCalendar = async ({
   clientEmail,
   service,
   date,
+  endDate,
 }: AddReservationToGoogleCalendarProps) => {
   try {
     await ensureAuthorized();
@@ -177,52 +254,103 @@ export const addReservationToGoogleCalendar = async ({
     const barber = await prisma.barber.findUnique({
       where: { id: barberId },
     });
+
     if (!barber) {
-      throwError('Barber not found', 404);
-      return;
+      logger.error(new Error(`Cannot sync reservation to Google Calendar: barber ${barberId} not found`));
+      return null;
+    }
+
+    if (!barber.googleCalendarId) {
+      logger.warn(`Barber ${barberId} has no Google Calendar, skipping calendar sync`);
+      return null;
     }
 
     const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
 
-    const endDate = new Date(date);
-    endDate.setMinutes(endDate.getMinutes() + service.duration);
-
-    const event = {
-      summary: `Client: ${clientName}`,
-      description: `Phone: ${clientPhone}\nEmail: ${clientEmail}\nService: ${service.nameEn}`,
-      start: {
-        dateTime: date.toISOString(),
-        timeZone: 'America/Toronto',
-      },
-      end: {
-        dateTime: endDate.toISOString(),
-        timeZone: 'America/Toronto',
-      },
-    };
-
-    if (!barber.googleCalendarId) {
-      throwError('Barber Google Calendar ID is not set', 400);
-      return;
-    }
-
     const response = await calendar.events.insert({
       calendarId: barber.googleCalendarId,
-      requestBody: event,
+      requestBody: buildReservationEvent({
+        clientName,
+        clientPhone,
+        clientEmail,
+        serviceName: service.nameEn,
+        startAt: date,
+        endAt: endDate ?? new Date(date.getTime() + service.duration * 60_000),
+      }),
     });
 
-    if (response.status === 200) {
-      return response.data;
-    } else {
-      throwError('Failed to create reservation in Google Calendar', 400);
-      return;
-    }
+    return response.data;
   } catch (error: any) {
-    if (error.code === 401 || error.message?.includes('invalid_grant')) {
-      throwError('Google Calendar authorization expired. Please re-authorize at /api/google/auth', 401);
-    } else {
-      throwError(`Failed to create reservation in Google Calendar: ${error.message || 'Unknown error'}`, 400);
-    }
-    return;
+    logger.error(new Error(`Failed to create Google Calendar event: ${describeCalendarError(error)}`));
+    return null;
+  }
+};
+
+/**
+ * Moves an existing event to a new time (and/or new details). Never throws; returns false when
+ * the caller should fall back to creating a fresh event.
+ */
+export const updateReservationInGoogleCalendar = async (
+  calendarId: string,
+  eventId: string,
+  details: ReservationEventDetails
+): Promise<boolean> => {
+  try {
+    await ensureAuthorized();
+
+    const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
+    await calendar.events.patch({
+      calendarId,
+      eventId,
+      requestBody: buildReservationEvent(details),
+    });
+
+    return true;
+  } catch (error: any) {
+    logger.error(new Error(`Failed to update Google Calendar event ${eventId}: ${describeCalendarError(error)}`));
+    return false;
+  }
+};
+
+/** Creates an event directly on a known calendar. Never throws; returns the event id or null. */
+export const createReservationCalendarEvent = async (
+  calendarId: string,
+  details: ReservationEventDetails
+): Promise<string | null> => {
+  try {
+    await ensureAuthorized();
+
+    const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
+    const response = await calendar.events.insert({
+      calendarId,
+      requestBody: buildReservationEvent(details),
+    });
+
+    return response.data.id ?? null;
+  } catch (error: any) {
+    logger.error(new Error(`Failed to create Google Calendar event: ${describeCalendarError(error)}`));
+    return null;
+  }
+};
+
+/**
+ * Removes an event from a barber calendar. Never throws: a failure here must not stop the
+ * reservation itself from being cancelled, it is only logged for follow-up.
+ */
+export const deleteReservationFromGoogleCalendar = async (calendarId: string, eventId: string): Promise<boolean> => {
+  try {
+    await ensureAuthorized();
+
+    const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
+    await calendar.events.delete({ calendarId, eventId });
+
+    return true;
+  } catch (error: any) {
+    // 404/410: the event is already gone, which is the state we wanted.
+    if (error?.code === 404 || error?.code === 410) return true;
+
+    logger.error(new Error(`Failed to delete Google Calendar event ${eventId}: ${describeCalendarError(error)}`));
+    return false;
   }
 };
 
@@ -230,6 +358,8 @@ export const addReservationToGoogleCalendar = async ({
 export const setupCalendarWatch = async (calendarId: string, webhookUrl: string) => {
   try {
     await ensureAuthorized();
+
+    logger.info(`Setting up calendar watch for calendar ID: ${calendarId} with webhook URL: ${webhookUrl}`);
 
     const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
 
