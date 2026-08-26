@@ -12,7 +12,12 @@ import {
   minutesToTime,
   parseTimeToMinutes,
 } from '../../packages/common/utils/reservation-time.utils';
-import { isValidReservationStatus, parseReservationStartEnd } from '../../packages/common/utils/reservation.utils';
+import {
+  CANCELLATION_DEADLINE_HOURS,
+  isPastCancellationDeadline,
+  isValidReservationStatus,
+  parseReservationStartEnd,
+} from '../../packages/common/utils/reservation.utils';
 import { hiddenTestBarberFilter } from '../../packages/common/utils/test-barber.utils';
 
 export const getAvailableTimes = async (req: Request, res: Response, next: NextFunction) => {
@@ -371,6 +376,25 @@ export const updateReservation = async (req: Request, res: Response, next: NextF
       return;
     }
 
+    const existingReservation = await prisma.reservation.findUnique({
+      where: { id },
+    });
+    if (!existingReservation) {
+      throwError('Reservation not found', 404);
+      return;
+    }
+
+    // Cancelling closes CANCELLATION_DEADLINE_HOURS before the *booked* start time, so the
+    // check uses the stored date rather than whatever date the request carries.
+    const isCancelling = status === ReservationStatus.CANCELLED && existingReservation.status !== 'CANCELLED';
+    if (isCancelling && isPastCancellationDeadline(existingReservation.date)) {
+      throwError(
+        `A reservation can only be cancelled at least ${CANCELLATION_DEADLINE_HOURS} hours before its start time`,
+        400
+      );
+      return;
+    }
+
     const service = await prisma.service.findUnique({
       where: { id: serviceId },
     });
@@ -507,6 +531,24 @@ export const deleteReservation = async (req: Request, res: Response, next: NextF
 
     if (!id) {
       throwError('Reservation ID is required', 400);
+      return;
+    }
+
+    const existingReservation = await prisma.reservation.findUnique({
+      where: { id },
+    });
+    if (!existingReservation) {
+      throwError('Reservation not found', 404);
+      return;
+    }
+
+    // Same window as cancelling through PUT: removing a booking this close to its start
+    // time still leaves the barber with an unfillable slot.
+    if (existingReservation.status !== 'CANCELLED' && isPastCancellationDeadline(existingReservation.date)) {
+      throwError(
+        `A reservation can only be cancelled at least ${CANCELLATION_DEADLINE_HOURS} hours before its start time`,
+        400
+      );
       return;
     }
 
