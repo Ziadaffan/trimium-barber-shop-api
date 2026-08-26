@@ -2,8 +2,8 @@ import type { Locale } from '../i18n/locale';
 import { logger } from '../logger';
 import { getSecretFromEnv, hmacHex, timingSafeEqualString } from './hmac.utils';
 
-/** A reservation can only be cancelled by the client up to this many minutes before it starts. */
-export const CANCELLATION_CUTOFF_MINUTES = 15;
+/** A reservation can only be cancelled by the client up to this many hours before it starts. */
+export const CANCELLATION_CUTOFF_HOURS = 3;
 
 const getCancellationSecret = (): string | null =>
   getSecretFromEnv('RESERVATION_CANCEL_SECRET', 'API_SECRET', 'JWT_SECRET');
@@ -47,7 +47,7 @@ export const verifyReservationCancelToken = (reservationId: string, startAtUtc: 
 };
 
 export const getCancellationDeadline = (startAtUtc: Date): Date =>
-  new Date(startAtUtc.getTime() - CANCELLATION_CUTOFF_MINUTES * 60_000);
+  new Date(startAtUtc.getTime() - CANCELLATION_CUTOFF_HOURS * 60 * 60_000);
 
 export const canCancelReservation = (startAtUtc: Date, now: Date = new Date()): boolean =>
   now.getTime() < getCancellationDeadline(startAtUtc).getTime();

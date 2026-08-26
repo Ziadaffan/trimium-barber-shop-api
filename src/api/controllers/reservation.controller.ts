@@ -23,7 +23,7 @@ import { hiddenTestBarberFilter } from '../../packages/common/utils/test-barber.
 import { type Locale, resolveLocale } from '../../packages/common/i18n/locale';
 import { getReservationStrings } from '../../packages/common/i18n/reservation.strings';
 import {
-  CANCELLATION_CUTOFF_MINUTES,
+  CANCELLATION_CUTOFF_HOURS,
   canCancelReservation,
   verifyReservationCancelToken,
 } from '../../packages/common/utils/reservation-cancel.utils';
@@ -591,7 +591,7 @@ const loadCancellableReservation = async (
   }
 
   if (!canCancelReservation(reservation.date)) {
-    return { ok: false, status: 409, message: strings.tooLate({ minutes: CANCELLATION_CUTOFF_MINUTES }) };
+    return { ok: false, status: 409, message: strings.tooLate({ hours: CANCELLATION_CUTOFF_HOURS }) };
   }
 
   return { ok: true, reservation };

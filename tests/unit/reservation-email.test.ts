@@ -69,10 +69,10 @@ describe('plain text body', () => {
 
   it('states the cancellation deadline as a real time', () => {
     expect(renderReservationConfirmationText({ ...baseInput, locale: 'fr' })).toContain(
-      "Vous pouvez annuler en ligne jusqu'à 14:15, soit au plus tard 15 minutes"
+      "Vous pouvez annuler en ligne jusqu'à 11:30, soit au plus tard 3 heures"
     );
     expect(renderReservationConfirmationText({ ...baseInput, locale: 'en' })).toContain(
-      'You can cancel online until 2:15 PM, that is up to 15 minutes'
+      'You can cancel online until 11:30 AM, that is up to 3 hours'
     );
   });
 

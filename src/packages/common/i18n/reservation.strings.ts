@@ -13,7 +13,7 @@ export interface ReservationStrings {
     labelPhone: string;
     addToGoogleCalendar: string;
     cancelCta: string;
-    cancelPolicy: (params: { minutes: number; deadlineTime: string }) => string;
+    cancelPolicy: (params: { hours: number; deadlineTime: string }) => string;
     ignoreNote: string;
     signature: string;
   };
@@ -33,7 +33,7 @@ export interface ReservationStrings {
     errorTitle: string;
     invalidLink: string;
     notFound: string;
-    tooLate: (params: { minutes: number }) => string;
+    tooLate: (params: { hours: number }) => string;
     serverError: string;
     callShop: (phone: string) => string;
   };
@@ -52,8 +52,10 @@ const en: ReservationStrings = {
     labelPhone: 'Phone',
     addToGoogleCalendar: 'Add to Google Calendar',
     cancelCta: 'Cancel my reservation',
-    cancelPolicy: ({ minutes, deadlineTime }) =>
-      `You can cancel online until ${deadlineTime}, that is up to ${minutes} minutes before your appointment starts.`,
+    cancelPolicy: ({ hours, deadlineTime }) =>
+      `You can cancel online until ${deadlineTime}, that is up to ${hours} ${
+        hours === 1 ? 'hour' : 'hours'
+      } before your appointment starts.`,
     ignoreNote: 'If you did not make this reservation, you can ignore this email.',
     signature: 'See you soon!',
   },
@@ -73,8 +75,10 @@ const en: ReservationStrings = {
     errorTitle: 'Cancellation not possible',
     invalidLink: 'This cancellation link is invalid or has expired.',
     notFound: 'This reservation no longer exists. It may already have been cancelled.',
-    tooLate: ({ minutes }) =>
-      `It is too late to cancel online: cancellations must be made at least ${minutes} minutes before the appointment starts.`,
+    tooLate: ({ hours }) =>
+      `It is too late to cancel online: cancellations must be made at least ${hours} ${
+        hours === 1 ? 'hour' : 'hours'
+      } before the appointment starts.`,
     serverError: 'Something went wrong on our side. Please try again in a moment.',
     callShop: phone => `Please call us at ${phone} and we will take care of it.`,
   },
@@ -93,8 +97,10 @@ const fr: ReservationStrings = {
     labelPhone: 'Téléphone',
     addToGoogleCalendar: 'Ajouter à Google Agenda',
     cancelCta: 'Annuler ma réservation',
-    cancelPolicy: ({ minutes, deadlineTime }) =>
-      `Vous pouvez annuler en ligne jusqu'à ${deadlineTime}, soit au plus tard ${minutes} minutes avant le début du rendez-vous.`,
+    cancelPolicy: ({ hours, deadlineTime }) =>
+      `Vous pouvez annuler en ligne jusqu'à ${deadlineTime}, soit au plus tard ${hours} ${
+        hours === 1 ? 'heure' : 'heures'
+      } avant le début du rendez-vous.`,
     ignoreNote: "Si vous n'avez pas fait cette réservation, vous pouvez ignorer ce courriel.",
     signature: 'À bientôt!',
   },
@@ -114,8 +120,10 @@ const fr: ReservationStrings = {
     errorTitle: 'Annulation impossible',
     invalidLink: "Ce lien d'annulation est invalide ou a expiré.",
     notFound: 'Cette réservation n’existe plus. Elle a peut-être déjà été annulée.',
-    tooLate: ({ minutes }) =>
-      `Il est trop tard pour annuler en ligne : l'annulation doit être faite au moins ${minutes} minutes avant le début du rendez-vous.`,
+    tooLate: ({ hours }) =>
+      `Il est trop tard pour annuler en ligne : l'annulation doit être faite au moins ${hours} ${
+        hours === 1 ? 'heure' : 'heures'
+      } avant le début du rendez-vous.`,
     serverError: 'Une erreur est survenue de notre côté. Veuillez réessayer dans un instant.',
     callShop: phone => `Appelez-nous au ${phone} et nous nous en occupons.`,
   },

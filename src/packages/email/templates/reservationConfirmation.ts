@@ -3,7 +3,7 @@ import { getReservationStrings } from '../../common/i18n/reservation.strings';
 import { CANADA_TIMEZONE } from '../../common/utils/reservation-time.utils';
 import { buildGoogleCalendarEventUrl } from '../../common/utils/google-calendar-link.utils';
 import {
-  CANCELLATION_CUTOFF_MINUTES,
+  CANCELLATION_CUTOFF_HOURS,
   buildReservationCancelUrl,
   getCancellationDeadline,
 } from '../../common/utils/reservation-cancel.utils';
@@ -106,7 +106,7 @@ export function renderReservationConfirmationText(input: ReservationConfirmation
     '',
     `${strings.email.addToGoogleCalendar}: ${googleCalendarUrl}`,
     cancelUrl ? `${strings.email.cancelCta}: ${cancelUrl}` : undefined,
-    cancelUrl ? strings.email.cancelPolicy({ minutes: CANCELLATION_CUTOFF_MINUTES, deadlineTime }) : undefined,
+    cancelUrl ? strings.email.cancelPolicy({ hours: CANCELLATION_CUTOFF_HOURS, deadlineTime }) : undefined,
     '',
     strings.email.signature,
   ]
@@ -151,7 +151,7 @@ export function renderReservationConfirmationHtml(input: ReservationConfirmation
   const cancelPolicy = cancelUrl
     ? `
                 <p style="margin:14px 0 0 0;font-size:12px;color:#64748b;line-height:1.5;">
-                  ${escapeHtml(strings.email.cancelPolicy({ minutes: CANCELLATION_CUTOFF_MINUTES, deadlineTime }))}
+                  ${escapeHtml(strings.email.cancelPolicy({ hours: CANCELLATION_CUTOFF_HOURS, deadlineTime }))}
                 </p>`
     : '';
 

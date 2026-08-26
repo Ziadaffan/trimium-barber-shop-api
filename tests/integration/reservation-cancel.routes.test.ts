@@ -78,7 +78,7 @@ beforeEach(() => {
 
 describe('GET the cancellation page', () => {
   it('shows a confirmation form in French', async () => {
-    const reservation = reservationStartingIn(180);
+    const reservation = reservationStartingIn(1440);
     prismaMock.reservation.findUnique.mockResolvedValue(reservation);
 
     const response = await request(app).get(cancelUrl(reservation, 'fr'));
@@ -92,7 +92,7 @@ describe('GET the cancellation page', () => {
   });
 
   it('shows the same page in English when asked', async () => {
-    const reservation = reservationStartingIn(180);
+    const reservation = reservationStartingIn(1440);
     prismaMock.reservation.findUnique.mockResolvedValue(reservation);
 
     const response = await request(app).get(cancelUrl(reservation, 'en'));
@@ -103,7 +103,7 @@ describe('GET the cancellation page', () => {
   });
 
   it('falls back to French when the link carries no locale', async () => {
-    const reservation = reservationStartingIn(180);
+    const reservation = reservationStartingIn(1440);
     prismaMock.reservation.findUnique.mockResolvedValue(reservation);
 
     const response = await request(app).get(cancelUrl(reservation));
@@ -112,7 +112,7 @@ describe('GET the cancellation page', () => {
   });
 
   it('never cancels anything, so email clients pre-fetching the link are harmless', async () => {
-    const reservation = reservationStartingIn(180);
+    const reservation = reservationStartingIn(1440);
     prismaMock.reservation.findUnique.mockResolvedValue(reservation);
 
     await request(app).get(cancelUrl(reservation, 'fr'));
@@ -122,7 +122,7 @@ describe('GET the cancellation page', () => {
   });
 
   it('rejects a tampered token with 403', async () => {
-    const reservation = reservationStartingIn(180);
+    const reservation = reservationStartingIn(1440);
     prismaMock.reservation.findUnique.mockResolvedValue(reservation);
 
     const response = await request(app).get(`/api/reservations/cancel?rid=${RESERVATION_ID}&token=nope&locale=fr`);
@@ -132,7 +132,7 @@ describe('GET the cancellation page', () => {
   });
 
   it('rejects a token that was issued before the reservation was moved', async () => {
-    const reservation = reservationStartingIn(180);
+    const reservation = reservationStartingIn(1440);
     const url = cancelUrl(reservation, 'en');
     prismaMock.reservation.findUnique.mockResolvedValue({
       ...reservation,
@@ -147,7 +147,7 @@ describe('GET the cancellation page', () => {
   });
 
   it('answers 404 for a reservation that no longer exists', async () => {
-    const reservation = reservationStartingIn(180);
+    const reservation = reservationStartingIn(1440);
     prismaMock.reservation.findUnique.mockResolvedValue(null);
 
     const response = await request(app).get(cancelUrl(reservation, 'en'));
@@ -156,7 +156,7 @@ describe('GET the cancellation page', () => {
     expect(response.text).toContain('This reservation no longer exists');
   });
 
-  it('refuses inside the 15 minute window and offers the shop phone number', async () => {
+  it('refuses inside the 3 hour window and offers the shop phone number', async () => {
     const reservation = reservationStartingIn(10);
     prismaMock.reservation.findUnique.mockResolvedValue(reservation);
 
@@ -178,7 +178,7 @@ describe('GET the cancellation page', () => {
 
 describe('POST the cancellation', () => {
   it('deletes the reservation and confirms in the chosen language', async () => {
-    const reservation = reservationStartingIn(180);
+    const reservation = reservationStartingIn(1440);
     prismaMock.reservation.findUnique.mockResolvedValue(reservation);
 
     const response = await postCancel(reservation, 'fr');
@@ -190,7 +190,7 @@ describe('POST the cancellation', () => {
 
   it('removes the barber calendar event before deleting the row', async () => {
     const calls: string[] = [];
-    const reservation = reservationStartingIn(180, {
+    const reservation = reservationStartingIn(1440, {
       googleEventId: 'google-event-1',
       barber: { name: 'Karim', googleCalendarId: 'calendar-1' },
     });
@@ -212,7 +212,7 @@ describe('POST the cancellation', () => {
   });
 
   it('still cancels when the calendar call fails', async () => {
-    const reservation = reservationStartingIn(180, {
+    const reservation = reservationStartingIn(1440, {
       googleEventId: 'google-event-1',
       barber: { name: 'Karim', googleCalendarId: 'calendar-1' },
     });
@@ -227,7 +227,7 @@ describe('POST the cancellation', () => {
   });
 
   it('skips the calendar entirely when the reservation has no event', async () => {
-    const reservation = reservationStartingIn(180);
+    const reservation = reservationStartingIn(1440);
     prismaMock.reservation.findUnique.mockResolvedValue(reservation);
 
     await postCancel(reservation, 'fr');
@@ -236,7 +236,7 @@ describe('POST the cancellation', () => {
   });
 
   it('does not delete anything when the token is wrong', async () => {
-    const reservation = reservationStartingIn(180);
+    const reservation = reservationStartingIn(1440);
     prismaMock.reservation.findUnique.mockResolvedValue(reservation);
 
     const response = await request(app)
@@ -260,7 +260,7 @@ describe('POST the cancellation', () => {
   });
 
   it('shows a localized error page instead of a stack trace when the database fails', async () => {
-    const reservation = reservationStartingIn(180);
+    const reservation = reservationStartingIn(1440);
     prismaMock.reservation.findUnique.mockResolvedValue(reservation);
     prismaMock.reservation.delete.mockRejectedValue(new Error('connection lost'));
 
@@ -272,7 +272,7 @@ describe('POST the cancellation', () => {
   });
 
   it('requires no credentials, since the signed token is the credential', async () => {
-    const reservation = reservationStartingIn(180);
+    const reservation = reservationStartingIn(1440);
     prismaMock.reservation.findUnique.mockResolvedValue(reservation);
 
     expect((await postCancel(reservation, 'fr')).status).toBe(200);

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
-  CANCELLATION_CUTOFF_MINUTES,
+  CANCELLATION_CUTOFF_HOURS,
   buildReservationCancelUrl,
   canCancelReservation,
   getCancellationDeadline,
@@ -67,19 +67,20 @@ describe('cancellation tokens', () => {
   });
 });
 
-describe('the 15 minute cutoff', () => {
-  it('is exactly 15 minutes before the start', () => {
-    expect(CANCELLATION_CUTOFF_MINUTES).toBe(15);
-    expect(getCancellationDeadline(START).toISOString()).toBe('2026-08-12T18:15:00.000Z');
+describe('the 3 hour cutoff', () => {
+  it('is exactly 3 hours before the start', () => {
+    expect(CANCELLATION_CUTOFF_HOURS).toBe(3);
+    expect(getCancellationDeadline(START).toISOString()).toBe('2026-08-12T15:30:00.000Z');
   });
 
   it('allows cancelling before the deadline and refuses from the deadline onwards', () => {
     const at = (minutesFromStart: number) => new Date(START.getTime() + minutesFromStart * 60_000);
 
-    expect(canCancelReservation(START, at(-16))).toBe(true);
-    expect(canCancelReservation(START, at(-15.01))).toBe(true);
+    expect(canCancelReservation(START, at(-181))).toBe(true);
+    expect(canCancelReservation(START, at(-180.01))).toBe(true);
+    expect(canCancelReservation(START, at(-180))).toBe(false);
+    expect(canCancelReservation(START, at(-179))).toBe(false);
     expect(canCancelReservation(START, at(-15))).toBe(false);
-    expect(canCancelReservation(START, at(-14))).toBe(false);
     expect(canCancelReservation(START, at(0))).toBe(false);
     expect(canCancelReservation(START, at(60))).toBe(false);
   });
