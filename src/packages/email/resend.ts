@@ -55,7 +55,12 @@ export async function sendReservationConfirmationEmail(
       html: renderReservationConfirmationHtml(input),
       text: renderReservationConfirmationText(input),
       replyTo: replyTo || undefined,
-      bcc: bcc ? bcc.split(',').map(v => v.trim()).filter(Boolean) : undefined,
+      bcc: bcc
+        ? bcc
+            .split(',')
+            .map(v => v.trim())
+            .filter(Boolean)
+        : undefined,
       tags: [{ name: 'type', value: 'reservation_confirmation' }],
     });
 
@@ -70,5 +75,3 @@ export async function sendReservationConfirmationEmail(
     return { ok: false, skipped: false, error };
   }
 }
-
-

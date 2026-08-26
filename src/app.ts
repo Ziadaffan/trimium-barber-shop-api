@@ -70,17 +70,27 @@ app.use('*', (req: Request, res: Response) => {
 
 app.use(errorHandlerMiddleware);
 
-cron.schedule('0 2 * * *', async () => {
-  try {
-    logger.info('Starting scheduled renewExpiredWatches task');
-    await renewExpiredWatches();
-    logger.info('Successfully completed renewExpiredWatches task');
-  } catch (error) {
-    logger.error('Failed to renew expired watches:', error);
-  }
-}, {
-  timezone: 'America/Montreal',
-});
+// On Vercel every invocation would register its own timer and die before it ever fires, so the
+// schedule there is vercel.json -> GET /api/cron/renew-watches. This is for long-lived servers.
+const useInProcessCron = !process.env.VERCEL && process.env.NODE_ENV !== 'test';
+
+if (useInProcessCron) {
+  cron.schedule(
+    '0 2 * * *',
+    async () => {
+      try {
+        logger.info('Starting scheduled renewExpiredWatches task');
+        await renewExpiredWatches();
+        logger.info('Successfully completed renewExpiredWatches task');
+      } catch (error) {
+        logger.error('Failed to renew expired watches:', error);
+      }
+    },
+    {
+      timezone: 'America/Montreal',
+    }
+  );
+}
 
 if (require.main === module) {
   app.listen(PORT, () => {

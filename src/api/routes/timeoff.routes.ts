@@ -5,6 +5,7 @@ import {
   getBarberTimeOffs,
   updateBarberTimeOff,
 } from '../controllers/schedule.controller';
+import { requireAdmin } from '../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -15,9 +16,9 @@ const router = Router();
 // DELETE /timeoffs/barber/:barberId/:timeOffId
 
 router.get('/barber/:barberId', getBarberTimeOffs);
-router.post('/barber/:barberId', createBarberTimeOff);
-router.put('/barber/:barberId/:timeOffId', updateBarberTimeOff);
-router.delete('/barber/:barberId/:timeOffId', deleteBarberTimeOff);
+
+router.post('/barber/:barberId', requireAdmin, createBarberTimeOff);
+router.put('/barber/:barberId/:timeOffId', requireAdmin, updateBarberTimeOff);
+router.delete('/barber/:barberId/:timeOffId', requireAdmin, deleteBarberTimeOff);
 
 export const timeoffRoutes = router;
-

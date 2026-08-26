@@ -6,19 +6,6 @@ export const isValidReservationStatus = (value: unknown): value is ReservationSt
   return (Object.values(ReservationStatus) as string[]).includes(value);
 };
 
-/** A reservation can no longer be cancelled once it starts in less than this many hours. */
-export const CANCELLATION_DEADLINE_HOURS = 3;
-
-const CANCELLATION_DEADLINE_MS = CANCELLATION_DEADLINE_HOURS * 60 * 60 * 1000;
-
-/**
- * True once the cancellation window has closed: the reservation starts in less than
- * CANCELLATION_DEADLINE_HOURS hours (already-started reservations included).
- * Both dates are UTC instants, so no timezone conversion is needed.
- */
-export const isPastCancellationDeadline = (reservationStartUtc: Date, now: Date = new Date()): boolean =>
-  reservationStartUtc.getTime() - now.getTime() < CANCELLATION_DEADLINE_MS;
-
 const parseLegacyReservationStart = (date: unknown, time: unknown): Date | null => {
   if (typeof date !== 'string') return null;
   if (typeof time !== 'string') return null;
@@ -60,5 +47,3 @@ export const parseReservationStartEnd = (input: {
 
   return { utcStart, utcEnd };
 };
-
-

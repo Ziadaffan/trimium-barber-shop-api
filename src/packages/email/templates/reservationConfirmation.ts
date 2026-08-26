@@ -1,10 +1,13 @@
-import { format } from 'date-fns';
-import { enCA, frCA } from 'date-fns/locale';
-import { toZonedTime } from 'date-fns-tz';
-
+import { DEFAULT_LOCALE, type Locale, formatReservationDay, formatReservationTime } from '../../common/i18n/locale';
+import { getReservationStrings } from '../../common/i18n/reservation.strings';
 import { CANADA_TIMEZONE } from '../../common/utils/reservation-time.utils';
-
-export type EmailLanguage = 'en' | 'fr';
+import { buildGoogleCalendarEventUrl } from '../../common/utils/google-calendar-link.utils';
+import {
+  CANCELLATION_CUTOFF_MINUTES,
+  buildReservationCancelUrl,
+  getCancellationDeadline,
+} from '../../common/utils/reservation-cancel.utils';
+import { escapeHtml } from '../../common/utils/html.utils';
 
 export interface ReservationConfirmationEmailInput {
   reservationId: string;
@@ -15,113 +18,149 @@ export interface ReservationConfirmationEmailInput {
   serviceName?: string;
   startAtUtc: Date;
   endAtUtc: Date;
-  language?: EmailLanguage;
+  locale?: Locale;
+  /** Fallback base URL for the cancellation link when PUBLIC_API_URL is not configured. */
+  requestOrigin?: string;
 }
 
-interface Copy {
-  htmlLang: string;
-  title: string;
-  subject: (service: string, day: string, time: string) => string;
-  greeting: (name: string) => string;
-  intro: string;
-  introHtml: (name: string) => string;
-  service: string;
-  barber: string;
-  when: string;
-  phone: string;
-  outro: string;
-  disclaimer: string;
+const SHOP_NAME = process.env.SHOP_NAME || 'Trimium';
+
+interface ReservationView {
+  locale: Locale;
+  strings: ReturnType<typeof getReservationStrings>;
+  day: string;
+  startTime: string;
+  endTime: string;
+  deadlineTime: string;
+  serviceName: string;
+  barberName: string;
+  googleCalendarUrl: string;
+  cancelUrl: string | null;
 }
 
-const COPY: Record<EmailLanguage, Copy> = {
-  fr: {
-    htmlLang: 'fr',
-    title: 'Réservation confirmée',
-    subject: (service, day, time) => `Réservation confirmée • ${service} • ${day} ${time}`,
-    greeting: name => `Bonjour ${name},`,
-    intro: 'Votre réservation est confirmée.',
-    introHtml: name => `Bonjour ${name}, votre réservation est confirmée.`,
-    service: 'Service',
-    barber: 'Barbier',
-    when: 'Quand',
-    phone: 'Téléphone',
-    outro: 'À bientôt!',
-    disclaimer: "Si vous n'avez pas fait cette réservation, vous pouvez ignorer cet email.",
-  },
-  en: {
-    htmlLang: 'en',
-    title: 'Reservation confirmed',
-    subject: (service, day, time) => `Reservation confirmed • ${service} • ${day} ${time}`,
-    greeting: name => `Hi ${name},`,
-    intro: 'Your reservation is confirmed.',
-    introHtml: name => `Hi ${name}, your reservation is confirmed.`,
-    service: 'Service',
-    barber: 'Barber',
-    when: 'When',
-    phone: 'Phone',
-    outro: 'See you soon!',
-    disclaimer: "If you didn't make this reservation, you can ignore this email.",
-  },
-};
+const buildView = (input: ReservationConfirmationEmailInput): ReservationView => {
+  const locale = input.locale ?? DEFAULT_LOCALE;
+  const strings = getReservationStrings(locale);
+  const serviceName = input.serviceName ?? '';
+  const barberName = input.barberName ?? '';
 
-const getCopy = (language?: EmailLanguage): Copy => COPY[language === 'en' ? 'en' : 'fr'];
+  const day = formatReservationDay(input.startAtUtc, locale);
+  const startTime = formatReservationTime(input.startAtUtc, locale);
+  const endTime = formatReservationTime(input.endAtUtc, locale);
+  const deadlineTime = formatReservationTime(getCancellationDeadline(input.startAtUtc), locale);
 
-const formatParts = (input: ReservationConfirmationEmailInput) => {
-  const locale = input.language === 'en' ? enCA : frCA;
-  const startLocal = toZonedTime(input.startAtUtc, CANADA_TIMEZONE);
-  const endLocal = toZonedTime(input.endAtUtc, CANADA_TIMEZONE);
+  const details = [
+    `${strings.email.labelService}: ${serviceName}`,
+    barberName ? `${strings.email.labelBarber}: ${barberName}` : undefined,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const googleCalendarUrl = buildGoogleCalendarEventUrl({
+    title: serviceName ? `${serviceName} — ${SHOP_NAME}` : SHOP_NAME,
+    startAtUtc: input.startAtUtc,
+    endAtUtc: input.endAtUtc,
+    details,
+    location: process.env.SHOP_ADDRESS || undefined,
+  });
+
+  const cancelUrl = buildReservationCancelUrl({
+    reservationId: input.reservationId,
+    startAtUtc: input.startAtUtc,
+    locale,
+    requestOrigin: input.requestOrigin,
+  });
 
   return {
-    day: format(startLocal, 'PPP', { locale }),
-    startTime: format(startLocal, 'HH:mm'),
-    endTime: format(endLocal, 'HH:mm'),
+    locale,
+    strings,
+    day,
+    startTime,
+    endTime,
+    deadlineTime,
+    serviceName,
+    barberName,
+    googleCalendarUrl,
+    cancelUrl,
   };
 };
 
 export function renderReservationConfirmationSubject(input: ReservationConfirmationEmailInput): string {
-  const copy = getCopy(input.language);
-  const { day, startTime } = formatParts(input);
-  return copy.subject(input.serviceName || '', day, startTime);
+  const { strings, serviceName, day, startTime } = buildView(input);
+  return strings.email.subject({ serviceName, day, time: startTime });
 }
 
 export function renderReservationConfirmationText(input: ReservationConfirmationEmailInput): string {
-  const copy = getCopy(input.language);
-  const { day, startTime, endTime } = formatParts(input);
+  const { strings, day, startTime, endTime, deadlineTime, serviceName, barberName, googleCalendarUrl, cancelUrl } =
+    buildView(input);
 
   return [
-    copy.greeting(input.clientName),
+    strings.email.greeting(input.clientName),
     '',
-    copy.intro,
+    strings.email.intro,
     '',
-    `${copy.service}: ${input.serviceName}`,
-    `${copy.barber}: ${input.barberName}`,
-    `${copy.when}: ${day} ${startTime}–${endTime} (${CANADA_TIMEZONE})`,
-    input.clientPhone ? `${copy.phone}: ${input.clientPhone}` : undefined,
+    `${strings.email.labelService}: ${serviceName}`,
+    barberName ? `${strings.email.labelBarber}: ${barberName}` : undefined,
+    `${strings.email.labelWhen}: ${day} ${startTime}–${endTime} (${CANADA_TIMEZONE})`,
+    input.clientPhone ? `${strings.email.labelPhone}: ${input.clientPhone}` : undefined,
     '',
-    copy.outro,
+    `${strings.email.addToGoogleCalendar}: ${googleCalendarUrl}`,
+    cancelUrl ? `${strings.email.cancelCta}: ${cancelUrl}` : undefined,
+    cancelUrl ? strings.email.cancelPolicy({ minutes: CANCELLATION_CUTOFF_MINUTES, deadlineTime }) : undefined,
+    '',
+    strings.email.signature,
   ]
-    .filter(Boolean)
+    .filter(line => line !== undefined)
     .join('\n');
 }
 
 export function renderReservationConfirmationHtml(input: ReservationConfirmationEmailInput): string {
-  const copy = getCopy(input.language);
-  const { day, startTime, endTime } = formatParts(input);
+  const { strings, day, startTime, endTime, deadlineTime, serviceName, barberName, googleCalendarUrl, cancelUrl } =
+    buildView(input);
 
-  const safe = (value: string) =>
-    value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
+  const row = (label: string, value: string, isLast = false) => `
+                  <tr>
+                    <td style="padding:10px 0;${isLast ? '' : 'border-bottom:1px solid #eef2f6;'}">
+                      <span style="color:#64748b;font-size:12px;">${escapeHtml(label)}</span><br />
+                      <span style="font-size:14px;font-weight:600;">${value}</span>
+                    </td>
+                  </tr>`;
+
+  const detailRows = [
+    row(strings.email.labelService, escapeHtml(serviceName)),
+    barberName ? row(strings.email.labelBarber, escapeHtml(barberName)) : '',
+    row(
+      strings.email.labelWhen,
+      `${escapeHtml(day)} ${escapeHtml(startTime)}–${escapeHtml(endTime)} (${escapeHtml(CANADA_TIMEZONE)})`,
+      !input.clientPhone
+    ),
+    input.clientPhone ? row(strings.email.labelPhone, escapeHtml(input.clientPhone), true) : '',
+  ].join('');
+
+  const cancelButton = cancelUrl
+    ? `
+                  <tr>
+                    <td style="padding:10px 0 0 0;">
+                      <a href="${escapeHtml(cancelUrl)}" style="display:inline-block;padding:12px 18px;border-radius:8px;background:#ffffff;border:1px solid #e11d48;color:#e11d48;font-size:14px;font-weight:600;text-decoration:none;">${escapeHtml(
+                        strings.email.cancelCta
+                      )}</a>
+                    </td>
+                  </tr>`
+    : '';
+
+  const cancelPolicy = cancelUrl
+    ? `
+                <p style="margin:14px 0 0 0;font-size:12px;color:#64748b;line-height:1.5;">
+                  ${escapeHtml(strings.email.cancelPolicy({ minutes: CANCELLATION_CUTOFF_MINUTES, deadlineTime }))}
+                </p>`
+    : '';
 
   return `<!doctype html>
-<html lang="${copy.htmlLang}">
+<html lang="${strings.htmlLang}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${copy.title}</title>
+    <title>${escapeHtml(strings.email.title)}</title>
   </head>
   <body style="margin:0;padding:0;background:#f6f7f9;font-family:Arial, Helvetica, sans-serif;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f7f9;padding:24px 12px;">
@@ -133,46 +172,42 @@ export function renderReservationConfirmationHtml(input: ReservationConfirmation
                 <table role="presentation" cellspacing="0" cellpadding="0" style="margin-bottom:8px;">
                   <tr>
                     <td style="padding-right:12px;vertical-align:middle;">
-                      <img src="https://res.cloudinary.com/djhjhwelu/image/upload/v1766767146/logo_qppald.png" alt="Trimium Logo" style="height:40px;width:auto;display:block;" />
+                      <img src="https://res.cloudinary.com/djhjhwelu/image/upload/v1766767146/logo_qppald.png" alt="${escapeHtml(
+                        SHOP_NAME
+                      )}" style="height:40px;width:auto;display:block;" />
                     </td>
                     <td style="vertical-align:middle;">
-                      <div style="font-size:16px;font-weight:700;">${copy.title}</div>
+                      <div style="font-size:16px;font-weight:700;">${escapeHtml(strings.email.title)}</div>
                     </td>
                   </tr>
                 </table>
-                <div style="font-size:13px;opacity:0.85;margin-top:4px;">${safe(input.serviceName || '')} • ${safe(day)} ${safe(
-                  startTime
-                )}</div>
+                <div style="font-size:13px;opacity:0.85;margin-top:4px;">${escapeHtml(serviceName)} • ${escapeHtml(
+                  day
+                )} ${escapeHtml(startTime)}</div>
               </td>
             </tr>
             <tr>
               <td style="padding:22px;color:#0b1220;">
-                <p style="margin:0 0 12px 0;font-size:14px;line-height:1.45;">${copy.introHtml(safe(input.clientName))}</p>
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-top:14px;">
-                  <tr>
-                    <td style="padding:10px 0;border-bottom:1px solid #eef2f6;">
-                      <span style="color:#64748b;font-size:12px;">${copy.service}</span><br />
-                      <span style="font-size:14px;font-weight:600;">${safe(input.serviceName || '')}</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding:10px 0;border-bottom:1px solid #eef2f6;">
-                      <span style="color:#64748b;font-size:12px;">${copy.barber}</span><br />
-                      <span style="font-size:14px;font-weight:600;">${safe(input.barberName || '')}</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding:10px 0;">
-                      <span style="color:#64748b;font-size:12px;">${copy.when}</span><br />
-                      <span style="font-size:14px;font-weight:600;">${safe(day)} ${safe(startTime)}–${safe(
-                        endTime
-                      )} (${safe(CANADA_TIMEZONE)})</span>
-                    </td>
-                  </tr>
+                <p style="margin:0 0 12px 0;font-size:14px;line-height:1.45;">${escapeHtml(
+                  strings.email.greeting(input.clientName)
+                )} ${escapeHtml(strings.email.intro)}</p>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-top:14px;">${detailRows}
                 </table>
+                <table role="presentation" cellspacing="0" cellpadding="0" style="margin-top:22px;">
+                  <tr>
+                    <td style="padding:0;">
+                      <a href="${escapeHtml(
+                        googleCalendarUrl
+                      )}" style="display:inline-block;padding:12px 18px;border-radius:8px;background:#0b1220;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">${escapeHtml(
+                        strings.email.addToGoogleCalendar
+                      )}</a>
+                    </td>
+                  </tr>${cancelButton}
+                </table>${cancelPolicy}
                 <p style="margin:18px 0 0 0;font-size:12px;color:#64748b;line-height:1.5;">
-                  ${copy.disclaimer}
+                  ${escapeHtml(strings.email.ignoreNote)}
                 </p>
+                <p style="margin:14px 0 0 0;font-size:14px;color:#0b1220;">${escapeHtml(strings.email.signature)}</p>
               </td>
             </tr>
           </table>

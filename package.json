@@ -7,8 +7,11 @@
     "postinstall": "prisma generate",
     "build": "rimraf dist && tsc && tsc-alias -p tsconfig.json -f --outDir dist",
     "start": "node dist/app.js",
-    "predev": "docker compose up -d db",
     "dev": "dotenv -e .env.local -- ts-node-dev --respawn --transpile-only src/app.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "commit": "cz",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -70,6 +73,7 @@
     "@types/multer": "^2.0.0",
     "@types/node": "^20.10.5",
     "@types/node-schedule": "^2.1.8",
+    "@types/supertest": "^7.2.1",
     "@vercel/node": "^5.5.33",
     "commitizen": "^4.3.1",
     "cz-conventional-changelog": "^3.3.0",
@@ -77,9 +81,11 @@
     "dotenv-cli": "^8.0.0",
     "prettier": "^3.6.2",
     "rimraf": "^5.0.5",
+    "supertest": "^7.2.2",
     "ts-node-dev": "^2.0.0",
     "tsc-alias": "^1.8.10",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^4.1.10"
   },
   "config": {
     "commitizen": {

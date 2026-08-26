@@ -31,4 +31,3 @@ export function getReservationTimeUTC(date: string, time: string) {
 
   return fromZonedTime(parsedDate, CANADA_TIMEZONE);
 }
-

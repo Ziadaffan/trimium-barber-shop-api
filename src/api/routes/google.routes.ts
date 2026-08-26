@@ -7,22 +7,19 @@ import {
   setupWebhook,
   getAvailableCalendars,
 } from '../controllers/google.controller';
+import { requireAdmin } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-router.get('/auth', getGoogleAuthUrl);
+// Admin only: these start the OAuth flow, expose calendar metadata or change subscriptions.
+router.get('/auth', requireAdmin, getGoogleAuthUrl);
+router.get('/status', requireAdmin, checkGoogleAuthStatus);
+router.get('/calendars', requireAdmin, getAvailableCalendars);
+router.post('/webhook/setup', requireAdmin, setupWebhook);
 
+// Public by necessity, both are called by Google itself.
+// The callback is guarded by the signed `state` that only /auth can mint.
 router.get('/callback', handleGoogleCallback);
-
-router.get('/status', checkGoogleAuthStatus);
-
-// List available calendars
-router.get('/calendars', getAvailableCalendars);
-
-// Webhook endpoint (no auth middleware - Google will call this directly)
 router.post('/webhook', handleCalendarWebhook);
-
-// Setup webhook for a calendar
-router.post('/webhook/setup', setupWebhook);
 
 export const googleRoutes = router;

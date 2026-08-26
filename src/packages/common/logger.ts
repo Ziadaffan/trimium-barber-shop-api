@@ -3,21 +3,32 @@ import { LogtailTransport } from '@logtail/winston';
 import winston from 'winston';
 
 const isLocal = process.env.ENV === 'dev';
+const telemetryToken = process.env.TELEMETRY_SOURCE_TOKEN;
+const telemetryEndpoint = process.env.TELEMETRY_ENDPOINT;
 
-const logtail = new Logtail(process.env.TELEMETRY_SOURCE_TOKEN ?? '', {
-  endpoint: process.env.TELEMETRY_ENDPOINT ?? '',
-});
+const consoleTransport = () =>
+  new winston.transports.Console({
+    format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
+  });
 
 const transports: winston.transport[] = [];
 
 if (isLocal) {
+  transports.push(consoleTransport());
+} else if (telemetryToken) {
+  // Logtail throws on an empty token, so it is only built once we know we have one. The endpoint
+  // is omitted rather than passed as undefined, which would override Logtail's own default.
   transports.push(
-    new winston.transports.Console({
-      format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
-    })
+    new LogtailTransport(new Logtail(telemetryToken, telemetryEndpoint ? { endpoint: telemetryEndpoint } : undefined))
   );
 } else {
-  transports.push(new LogtailTransport(logtail));
+  // Degrade to stdout rather than crashing the process on a missing variable.
+  transports.push(consoleTransport());
+}
+
+if (process.env.NODE_ENV === 'test') {
+  transports.length = 0;
+  transports.push(new winston.transports.Console({ silent: true }));
 }
 
 const estTimestamp = winston.format.timestamp({
